@@ -18,7 +18,16 @@ import {
   COS30,
   type Box,
 } from './iso';
-import { GROUND, SKID_BOXES, LOAD_BOX, SUB_BOX } from './layout';
+import {
+  GROUND,
+  SKID_BOXES,
+  LOAD_BOX,
+  SUB_BOX,
+  SUB_BUSHINGS,
+  BUSHING_TOPS,
+  LINE_ATTACH,
+  PYLON,
+} from './layout';
 
 const box = (x: number, y: number, z: number): Box => ({ x, y, z, w: 10, h: 10, d: 10 });
 
@@ -131,6 +140,52 @@ describe('site layout', () => {
     for (const [id, b] of Object.entries(SKID_BOXES)) expect(on(b), id).toBe(true);
     expect(on(LOAD_BOX), 'LOAD').toBe(true);
     expect(on(SUB_BOX), 'SUBSTATION').toBe(true);
+  });
+
+  it('lands every conductor exactly on an HV bushing', () => {
+    // Regression: the conductors and the transformer were placed independently, so the line
+    // terminated up to 15 units above the bushings and off in Z — visibly unconnected.
+    expect(LINE_ATTACH).toHaveLength(SUB_BUSHINGS.length);
+
+    for (const [i, top] of BUSHING_TOPS.entries()) {
+      const b = SUB_BUSHINGS[i];
+      expect(top.x).toBeCloseTo(b.x + b.w / 2, 6);
+      expect(top.y).toBeCloseTo(b.y + b.h, 6);
+      expect(top.z).toBeCloseTo(b.z + b.d / 2, 6);
+    }
+  });
+
+  it('takes every conductor off the substation side of the tower', () => {
+    // A conductor starting on the far arm would have to pass through the tower to reach the
+    // substation.
+    for (const a of LINE_ATTACH) {
+      expect(a.x).toBeLessThan(PYLON.x);
+      expect(a.x).toBeGreaterThan(SUB_BOX.x + SUB_BOX.w);
+    }
+  });
+
+  it('runs the conductors downhill, so they descend onto the bushings', () => {
+    for (const [i, a] of LINE_ATTACH.entries()) {
+      expect(a.y).toBeGreaterThan(BUSHING_TOPS[i].y);
+    }
+  });
+
+  it('keeps the conductor runs from crossing each other', () => {
+    // Parallel runs: sorting the attachments by X must give the same order as their targets.
+    const byAttach = LINE_ATTACH.map((a, i) => ({ ax: a.x, tx: BUSHING_TOPS[i].x })).sort(
+      (p, q) => q.ax - p.ax,
+    );
+    const targets = byAttach.map((e) => e.tx);
+    expect(targets).toEqual([...targets].sort((p, q) => q - p));
+  });
+
+  it('stands the tower on the ground slab', () => {
+    // The slab used to end before the tower, leaving it floating off the edge of the site.
+    const reach = PYLON.x + PYLON.arms[0].half;
+    expect(reach).toBeLessThanOrEqual(GROUND.x + GROUND.w);
+    expect(PYLON.x - PYLON.arms[0].half).toBeGreaterThanOrEqual(GROUND.x);
+    expect(PYLON.z).toBeGreaterThanOrEqual(GROUND.z);
+    expect(PYLON.z).toBeLessThanOrEqual(GROUND.z + GROUND.d);
   });
 
   it('anchors markers to the top face, not the base', () => {

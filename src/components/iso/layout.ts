@@ -11,7 +11,7 @@
 import type { Box } from './iso';
 
 /** Ground slab the whole site sits on. */
-export const GROUND: Box = { x: -108, y: -3.5, z: -18, w: 372, h: 3.5, d: 88 };
+export const GROUND: Box = { x: -108, y: -3.5, z: -18, w: 428, h: 3.5, d: 88 };
 
 /** Containerised skid: long along X, matching the figure's proportions. */
 const SKID_W = 40;
@@ -56,9 +56,10 @@ export const SUB_BUSHINGS: Box[] = [
  * this scale reads as a grey blob, and the figure draws it as a wireframe too.
  */
 export const PYLON = {
-  /** Footprint centre. */
-  x: 276,
-  z: 20,
+  /** Footprint centre. Set back in Z and out in X so the mast clears the transformer —
+      the legs previously projected across it and occluded the tank. */
+  x: 290,
+  z: 4,
   /** Half-width at the base, tapering to `topHalf` at the waist. */
   baseHalf: 16,
   topHalf: 5,
@@ -73,6 +74,34 @@ export const PYLON = {
   /** Peak above the top band. */
   peak: 9,
 };
+
+/**
+ * Termination points for the incoming transmission line: the top of each HV bushing.
+ *
+ * Exported so the pylon's conductors and the transformer share one source of truth — they were
+ * independently placed before, and ended up not meeting.
+ */
+export const BUSHING_TOPS = SUB_BUSHINGS.map((b) => ({
+  x: b.x + b.w / 2,
+  y: b.y + b.h,
+  z: b.z + b.d / 2,
+}));
+
+/**
+ * Where each conductor leaves the tower, on the substation side.
+ *
+ * Three phases, all on the -X side because that is where the substation is; a conductor
+ * starting on the far arm would have to pass through the tower to reach it. Ordered so the
+ * runs stay parallel and never cross.
+ */
+export const LINE_ATTACH = [
+  // Index i terminates on BUSHING_TOPS[i]. Ordered so the attachment nearest the substation
+  // feeds the bushing furthest from the tower: pairing them the other way makes the runs
+  // cross over each other on the way in.
+  { x: PYLON.x - PYLON.arms[0].half, y: PYLON.arms[0].y - PYLON.arms[0].drop, z: PYLON.z },
+  { x: PYLON.x - PYLON.arms[1].half, y: PYLON.arms[1].y - PYLON.arms[1].drop, z: PYLON.z },
+  { x: PYLON.x - PYLON.arms[0].half * 0.45, y: PYLON.arms[0].y - PYLON.arms[0].drop, z: PYLON.z },
+];
 
 /** Where the feeder trenches run, drawn flat on the ground. */
 export const FEEDER_Y = 0.4;

@@ -29,8 +29,10 @@ import {
 } from './iso/iso';
 import { diagramToClient } from './layout';
 import {
+  BUSHING_TOPS,
   FEEDER_Y,
   GROUND,
+  LINE_ATTACH,
   LOAD_ANNEX,
   LOAD_BOX,
   LOAD_PLANT,
@@ -68,6 +70,10 @@ const SCENE = screenBounds([
   ...Object.values(SKID_BOXES).flatMap(boxCorners),
   ...boxCorners(SUB_PAD),
   project(PYLON.x, PYLON.height + PYLON.peak, PYLON.z),
+  // The arms reach well past the mast; fitting to the centre line alone clipped them.
+  project(PYLON.x - PYLON.arms[0].half, 0, PYLON.z),
+  project(PYLON.x + PYLON.arms[0].half, 0, PYLON.z),
+  project(PYLON.x + PYLON.arms[0].half, PYLON.arms[0].y, PYLON.z),
 ]);
 
 /** Label gutters: generous left and right, a band on top for the skid group label. */
@@ -355,16 +361,37 @@ function Pylon({ yaw }: { yaw: number }) {
         );
       })}
 
-      {/* Conductors running off toward the substation. */}
+      {/*
+        The three phase conductors, each landing on its own HV bushing.
+        Sag is a real catenary dip applied in world space before projection, so it reads
+        correctly at any yaw rather than being a fixed screen-space curve.
+      */}
+      {LINE_ATTACH.map((a, i) => {
+        const t = BUSHING_TOPS[i];
+        const from = p(a.x, a.y, a.z);
+        const to = p(t.x, t.y, t.z);
+        const sag = 5;
+        const ctrl = p((a.x + t.x) / 2, (a.y + t.y) / 2 - sag * 2, (a.z + t.z) / 2);
+        return (
+          <path
+            key={`cond${i}`}
+            className="iso-conductor"
+            d={`M${from.x.toFixed(2)} ${from.y.toFixed(2)} Q${ctrl.x.toFixed(2)} ${ctrl.y.toFixed(2)} ${to.x.toFixed(2)} ${to.y.toFixed(2)}`}
+          />
+        );
+      })}
+
+      {/* The line continues away from the site on the far side. */}
       {arms.map((a) =>
-        [-1, 1].map((sgn) => {
-          const from = p(x + sgn * a.half, a.y - a.drop, z);
-          const to = p(x - 74, a.y - a.drop - 10 + sgn * 3, z + sgn * 6);
+        [a.half, a.half * 0.45].map((off) => {
+          const from = p(x + off, a.y - a.drop, z);
+          const to = p(x + off + 34, a.y - a.drop - 6, z);
+          const ctrl = p(x + off + 17, a.y - a.drop - 8, z);
           return (
             <path
-              key={`c${a.y}${sgn}`}
+              key={`out${a.y}${off}`}
               className="iso-conductor"
-              d={`M${from.x.toFixed(2)} ${from.y.toFixed(2)} Q${((from.x + to.x) / 2).toFixed(2)} ${((from.y + to.y) / 2 + 7).toFixed(2)} ${to.x.toFixed(2)} ${to.y.toFixed(2)}`}
+              d={`M${from.x.toFixed(2)} ${from.y.toFixed(2)} Q${ctrl.x.toFixed(2)} ${ctrl.y.toFixed(2)} ${to.x.toFixed(2)} ${to.y.toFixed(2)}`}
             />
           );
         }),
