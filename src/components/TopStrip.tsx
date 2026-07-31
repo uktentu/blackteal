@@ -9,7 +9,7 @@
 import { memo } from 'react';
 import type { AssetState } from '../domain/types';
 import { StatusIndicator } from './StatusIndicator';
-import { fmt, fmtAgo, fmtClock } from './format';
+import { fmt, fmtAgo, fmtClock, fmtDate } from './format';
 import './topstrip.css';
 
 interface Props {
@@ -47,7 +47,7 @@ export const TopStrip = memo(function TopStrip({
 
       {/* Wall clock. "When did this start?" is unanswerable without one on screen. */}
       <div className="topstrip-clock">
-        <span className="balance-label">Site time</span>
+        <span className="topstrip-date metric">{fmtDate(now)}</span>
         <span className="topstrip-time metric">{fmtClock(now)}</span>
       </div>
 

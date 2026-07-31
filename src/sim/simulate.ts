@@ -12,6 +12,7 @@
  * the telemetry actually being displayed.
  */
 
+import { INITIAL_SNAPSHOT } from '../domain/snapshot';
 import { NAMEPLATE, SKID_IDS } from '../domain/topology';
 import type {
   BatteryTelemetry,
@@ -41,12 +42,27 @@ const ANCHOR = {
 
 export const TICK_MS = 1000;
 
-function jitterPcs(rng: Rng, p: PcsTelemetry): PcsTelemetry {
+/**
+ * Each skid's nominal dispatch, taken from the brief's own snapshot. Jitter and the envelope
+ * clamp both work relative to this, so a skid always returns to its setpoint once free to.
+ */
+const NOMINAL_KW: Record<string, number> = Object.fromEntries(
+  SKID_IDS.map((id) => [id, (INITIAL_SNAPSHOT.assets[id] as SkidAsset).pcs?.power_kW ?? -1950]),
+);
+
+function jitterPcs(rng: Rng, p: PcsTelemetry, nominal_kW: number): PcsTelemetry {
   const next: PcsTelemetry = { ...p };
 
   if (p.power_kW != null) {
-    // Discharge power is anchored to itself: scenarios own the setpoint, jitter only wobbles it.
-    next.power_kW = round(jitter(rng, p.power_kW, p.power_kW, 0.004, 0), 0);
+    /**
+     * Anchored to the skid's nominal dispatch, not to itself.
+     *
+     * Anchoring to its own last value made the clamp one-way: once `enforceEnvelope` pushed a
+     * derated skid down to 1.4 MW, nothing brought it back after the envelope recovered, and
+     * it sat ~1 MW below its healthy siblings forever with no alarm to explain why. The
+     * restoring pull means output returns to dispatch as soon as the constraint lifts.
+     */
+    next.power_kW = round(jitter(rng, p.power_kW, nominal_kW, 0.004, 0.05), 0);
   }
   if (p.dc_voltage_V != null) {
     next.dc_voltage_V = round(jitterClamped(rng, p.dc_voltage_V, 1330, 1150, 1500), 0);
@@ -182,7 +198,7 @@ export function simulateFrame(prev: SiteState, ctl: SimControl, seed: number): S
       continue;
     }
 
-    const pcs = jitterPcs(rng, sk.pcs);
+    const pcs = jitterPcs(rng, sk.pcs, NOMINAL_KW[id] ?? sk.pcs.power_kW ?? 0);
     const battery = jitterBattery(rng, sk.battery, pcs.power_kW);
     const loading = (Math.abs(pcs.power_kW ?? 0) / 1000 / NAMEPLATE.skidTransformer_MVA) * 100;
     const transformer =

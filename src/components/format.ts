@@ -55,11 +55,29 @@ export function fmtAgo(ms: number): string {
   return `${m}m ${s % 60}s ago`;
 }
 
-/** Wall-clock HH:MM:SS — control rooms always show the time. */
+const pad = (n: number) => String(n).padStart(2, '0');
+
+/**
+ * Timestamps are ISO-ordered: YYYY-MM-DD HH:MM:SS.
+ *
+ * Deliberately not a locale format. 03/04 is ambiguous between two continents, and an event
+ * log is exactly where that ambiguity becomes an incident report someone misreads. ISO order
+ * also sorts lexicographically, which is what you want in a log.
+ */
+export function fmtDate(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** HH:MM:SS — seconds always, because a 1 Hz feed changes within the minute. */
 export function fmtClock(ms: number): string {
   const d = new Date(ms);
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+/** Full stamp: date and time to the second. */
+export function fmtStamp(ms: number): string {
+  return `${fmtDate(ms)} ${fmtClock(ms)}`;
 }
 
 /** Countdown as m:ss, for a time-boxed shelve. */

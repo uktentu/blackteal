@@ -60,20 +60,37 @@
   padding: 1px 5px;
 }
 
-.console-asset-filter {
+/* Both filters share one class, so they cannot drift apart visually. */
+.console-filter {
+  font: inherit;
   font-size: 11px;
-  width: 120px;
+  width: 150px;
   padding: 4px var(--bt-2);
   min-height: 28px;
-  color: var(--bt-text);
+  color: var(--bt-text-muted);
   background: var(--bt-bg);
   border: 1px solid var(--bt-rule-strong);
   border-radius: 2px;
 }
 
-.console-asset-filter::placeholder {
-  color: var(--bt-text-faint);
-  font-family: var(--bt-sans);
+/* An engaged filter is stated in the interaction accent — it is a view choice, not a status. */
+.console-filter[data-active] {
+  color: var(--bt-text);
+  border-color: var(--bt-accent);
+}
+
+.console-filter-clear {
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  padding: 4px var(--bt-2);
+  min-height: 28px;
+  color: var(--bt-accent);
+  background: transparent;
+  border: 1px solid var(--bt-accent);
+  border-radius: 2px;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 /* ---- header ---- */
@@ -150,17 +167,6 @@
   display: flex;
   align-items: center;
   gap: var(--bt-2);
-}
-
-.console-filters select {
-  font: inherit;
-  font-size: 11px;
-  padding: 4px var(--bt-2);
-  min-height: 28px;
-  color: var(--bt-text-muted);
-  background: var(--bt-bg);
-  border: 1px solid var(--bt-rule-strong);
-  border-radius: 2px;
 }
 
 .console-check {
@@ -370,4 +376,23 @@
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--bt-text);
+}
+
+/**
+ * At narrow widths the filters wrap onto their own line. Without releasing the fixed header
+ * height they overlap the first alarm row — the same fix already applied to the top strip.
+ */
+@media (max-width: 720px) {
+  .console-head {
+    height: auto;
+    min-height: 38px;
+    flex-wrap: wrap;
+    padding: var(--bt-2) var(--bt-3);
+    gap: var(--bt-2) var(--bt-3);
+  }
+
+  .console-filters {
+    width: 100%;
+    margin-left: 0;
+  }
 }

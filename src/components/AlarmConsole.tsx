@@ -24,6 +24,8 @@ export type ConsoleTab = 'active' | 'history';
 
 interface Props {
   groups: AlarmGroup[];
+  /** Unfiltered site-wide alarm count, so the console can say how many it is hiding. */
+  totalAlarms: number;
   events: AlarmEvent[];
   tab: ConsoleTab;
   onTab: (t: ConsoleTab) => void;
@@ -43,6 +45,7 @@ interface Props {
 
 export const AlarmConsole = memo(function AlarmConsole({
   groups,
+  totalAlarms,
   events,
   tab,
   onTab,
@@ -60,6 +63,10 @@ export const AlarmConsole = memo(function AlarmConsole({
 }: Props) {
   const counts = alarmCounts(groups);
   const listRef = useRef<HTMLDivElement | null>(null);
+
+  const filtered =
+    filters.assetId !== null || filters.severity !== null || !filters.showShelved;
+  const hidden = Math.max(0, totalAlarms - groups.reduce((n, g) => n + g.count, 0));
 
   /**
    * SAFETY: the rendered order is frozen while the operator is working in the list.
@@ -212,30 +219,28 @@ export const AlarmConsole = memo(function AlarmConsole({
 
         <div className="console-filters">
           {/*
-            A datalist input rather than a <select>: it type-filters, so it still works at 60
-            skids where a dropdown of 60 options does not.
+            Both filters are the same control, same size, same behaviour. A native <select>
+            also gets keyboard type-ahead for free, so it still works at sixty skids.
           */}
-          <input
-            className="console-asset-filter metric"
-            list="bt-asset-options"
-            placeholder="All assets"
+          <select
+            className="console-filter"
             aria-label="Filter by asset"
+            data-active={filters.assetId !== null || undefined}
             value={filters.assetId ?? ''}
-            onChange={(e) => {
-              const v = e.target.value.trim();
-              onFilters({ assetId: v === '' ? null : v });
-            }}
-          />
-          <datalist id="bt-asset-options">
+            onChange={(e) => onFilters({ assetId: e.target.value === '' ? null : e.target.value })}
+          >
+            <option value="">All assets</option>
             {TOPOLOGY.assets.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.label}
               </option>
             ))}
-          </datalist>
+          </select>
 
           <select
+            className="console-filter"
             aria-label="Filter by severity"
+            data-active={filters.severity !== null || undefined}
             value={filters.severity ?? ''}
             onChange={(e) =>
               onFilters({ severity: e.target.value === '' ? null : (e.target.value as Severity) })
@@ -254,6 +259,21 @@ export const AlarmConsole = memo(function AlarmConsole({
             />
             Show shelved
           </label>
+
+          {/*
+            A filtered alarm list is a partial view of the site, and forgetting that is how an
+            operator misses something. The badge states it plainly and clears in one click.
+          */}
+          {filtered && (
+            <button
+              type="button"
+              className="console-filter-clear"
+              onClick={() => onFilters({ assetId: null, severity: null, showShelved: true })}
+              title="Clear all filters"
+            >
+              Filtered · {hidden} hidden ✕
+            </button>
+          )}
         </div>
       </header>
 

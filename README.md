@@ -129,12 +129,18 @@ At 10k+ rows this would need revisiting.
 
 **Flood grouping threshold is 3, and it's a judgement call.** Below three, individual rows carry
 more information than a group — "TEMP_HIGH ×2" tells an operator less than seeing *which* two
-skids. Above three it's noise. A real system would make this configurable per code and probably
-time-boxed (group only alarms arriving within N seconds), which I'd add next.
+skids. Above three it's noise. A real system would make this configurable per code and also
+time-window it (group only alarms arriving within N seconds), which is the next refinement.
 
-**Ack clears when the alarm clears; shelve persists.** A recurring condition should re-demand
-attention, but shelving is an explicit operator decision. Real shelving is also time-boxed —
-"silence for 4 hours" — which I'd add with a countdown in the row.
+**Ack clears when the alarm clears; a shelve runs its timer.** A recurring condition should
+re-demand attention, so acknowledgement is dropped the moment its alarm clears. Shelving is an
+explicit decision and is time-boxed with a visible countdown (60 s here so it's demonstrable in
+a review; hours in a real plant). Neither survives a reload — restoring a shelve from a previous
+session could hide a live alarm from whoever comes on shift next.
+
+**Severity outranks acknowledgement in the sort.** Acking means "I have seen this", not "this is
+less dangerous", so an acknowledged critical still sits above an unacknowledged warning.
+Otherwise triaging the top of the list pushes the worst alarm out of view.
 
 **No zoom or pan on the diagram — deliberately.** I built it, then removed it. Zoom/pan is a
 map metaphor: it lets an operator navigate *away* from the asset that needs attention, so an
@@ -153,10 +159,10 @@ asset opens its panel, a missing metric renders a dash, a flood groups, Escape c
 exist because a zoom feature once broke click-to-open while every logic test stayed green.
 Playwright against the built bundle would still be the right next layer.
 
-**What I'd build next, in order:** time-boxed shelving with a countdown; grouping by *time
-window* as well as code; an alarm history/event log (currently only active alarms are visible,
-so an alarm that self-clears leaves no trace); and per-subsystem state on the diagram node so a
-PCS fault and a battery fault are distinguishable without opening the drawer.
+**What I'd build next, in order:** grouping by *time window* as well as by code; per-subsystem
+state on the diagram node, so a PCS fault and a battery fault are distinguishable without
+opening the drawer; persisting the event log to a backend so it survives a reload and can be
+audited; and Playwright specs against the built bundle to complement the component tests.
 
 ## Scaling notes
 

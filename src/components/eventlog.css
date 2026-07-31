@@ -15,11 +15,24 @@
   font-size: 12px;
 }
 
+/* Sized for the full "YYYY-MM-DD HH:MM:SS" stamp; nowrap so it can never wrap into the row
+   below it. Tabular figures keep the column edges straight down the log. */
 .event-time {
   font-size: 11px;
   color: var(--bt-text-faint);
   flex: none;
+  width: 140px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The drawer is narrow: drop to time-only there, where the date is the same day anyway. */
+.drawer .event-time {
   width: 62px;
+}
+
+.drawer .event-time .event-date {
+  display: none;
 }
 
 /* The transition is the point of this row, so it gets the strongest treatment here. */

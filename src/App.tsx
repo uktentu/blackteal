@@ -79,6 +79,10 @@ export default function App() {
   const [tab, setTab] = useState<ConsoleTab>('active');
 
   const recentEvents = useMemo(() => recent(events), [events]);
+  const totalAlarms = useMemo(
+    () => Object.values(site.assets).reduce((n, a) => n + a.alarms.length, 0),
+    [site],
+  );
   const assetEvents = useMemo(
     () => (selectedId === null ? [] : forAsset(events, selectedId)),
     [events, selectedId],
@@ -244,6 +248,7 @@ export default function App() {
       <ErrorBoundary label="The alarm console">
         <AlarmConsole
         groups={groups}
+        totalAlarms={totalAlarms}
         events={recentEvents}
         tab={tab}
         onTab={setTab}

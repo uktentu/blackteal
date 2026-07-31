@@ -18,7 +18,7 @@ import { derateCause, headroom } from '../sim/rules';
 import { explainAsset } from '../sim/explain';
 import type { AlarmEvent } from '../sim/alarmHistory';
 import { EventLog } from './EventLog';
-import { fmt, fmtAgo, fmtInt, NO_DATA, powerDirection, gridDirection } from './format';
+import { fmt, fmtAgo, fmtInt, fmtStamp, NO_DATA, powerDirection, gridDirection } from './format';
 import './drawer.css';
 
 interface Props {
@@ -169,7 +169,8 @@ function ConnectionHealth({
       <div className="conn" data-tone={verdict.tone}>
         <span className="conn-verdict">{verdict.text}</span>
         <dl className="rows">
-          <Row label="Last frame" value={stale ? fmtAgo(since) : '< 1s ago'} />
+          <Row label="Last frame" value={fmtStamp(lastFrameAt)} />
+          <Row label="Age" value={stale ? fmtAgo(since) : '< 1s'} />
           <Row label="Update interval" value="1.0 s" />
           <Row
             label="Source"

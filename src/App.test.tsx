@@ -174,11 +174,38 @@ describe('Stage 1: alarm console', () => {
 
   it('filters by asset', async () => {
     const { user } = renderApp();
-    await user.type(screen.getByLabelText('Filter by asset'), 'SKID-2');
+    await user.selectOptions(screen.getByLabelText('Filter by asset'), 'SKID-2');
 
     const rows = screen.getAllByRole('listitem').filter((li) => li.classList.contains('alarm'));
     expect(rows.length).toBe(2);
     expect(rows.every((r) => r.textContent?.includes('SKID-2'))).toBe(true);
+  });
+
+  it('uses the same control for both filters, so they cannot drift apart', () => {
+    renderApp();
+    const asset = screen.getByLabelText('Filter by asset');
+    const severity = screen.getByLabelText('Filter by severity');
+
+    expect(asset.tagName).toBe('SELECT');
+    expect(severity.tagName).toBe('SELECT');
+    expect(asset).toHaveClass('console-filter');
+    expect(severity).toHaveClass('console-filter');
+  });
+
+  it('says so when the list is filtered, and clears in one click', async () => {
+    const { user } = renderApp();
+    // An unannounced partial view is how an operator misses an alarm.
+    expect(screen.queryByTitle('Clear all filters')).not.toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText('Filter by severity'), 'critical');
+    const badge = screen.getByTitle('Clear all filters');
+    expect(badge).toHaveTextContent(/Filtered · 2 hidden/);
+
+    await user.click(badge);
+    expect(screen.queryByTitle('Clear all filters')).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole('listitem').filter((li) => li.classList.contains('alarm')),
+    ).toHaveLength(3);
   });
 
   it('rolls a flood into one counted row', async () => {

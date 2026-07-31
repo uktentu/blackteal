@@ -131,13 +131,19 @@ export function groupAlarms(site: SiteState, opts: FeedOptions): AlarmGroup[] {
   }
 
   // --- priority sort ---
-  // Shelved sinks to the bottom (it is silenced, not resolved), then unacknowledged above
-  // acknowledged, then critical above warning, then floods above singles, then stable by id.
+  //
+  // SEVERITY OUTRANKS ACKNOWLEDGEMENT. The brief says "priority-sorted (critical above
+  // warning)" with no exception, and it is right: acknowledging an alarm means "I have seen
+  // this", not "this is now less dangerous". A critical that has been read must still sit
+  // above a warning that has not — otherwise the act of triaging the top of the list pushes
+  // the worst alarm out of sight, which is the opposite of what the console is for.
+  //
+  // Shelved is different and does sink: it is an explicit, time-boxed decision to suppress.
   return groups.sort(
     (a, b) =>
       Number(a.shelved) - Number(b.shelved) ||
-      Number(a.acknowledged) - Number(b.acknowledged) ||
       SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity] ||
+      Number(a.acknowledged) - Number(b.acknowledged) ||
       b.count - a.count ||
       a.id.localeCompare(b.id),
   );

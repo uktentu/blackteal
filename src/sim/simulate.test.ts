@@ -347,6 +347,21 @@ describe('operating envelope is enforced, not advisory', () => {
     }
   });
 
+  it('returns a skid to its dispatch once the derate lifts', () => {
+    // Regression: the clamp was one-way. After SKID-2's envelope recovered to nameplate its
+    // output stayed pinned near the old 1.5 MW cap forever, ~1 MW below its siblings, with
+    // no alarm to explain the asymmetry.
+    const { frames } = run(90);
+    const settled = frames[frames.length - 1];
+    const sk = skid(settled, 'SKID-2');
+
+    expect(sk.battery!.envelope!.max_discharge_kW).toBe(NAMEPLATE.pcs_kW);
+    expect(sk.state).toBe('NORMAL');
+
+    // Back within 5% of the brief's own dispatch for this skid (-1480 kW).
+    expect(Math.abs(sk.pcs!.power_kW!)).toBeGreaterThan(1480 * 0.95);
+  });
+
   it('still balances power after clamping', () => {
     const { frames } = run(TIMELINE.burst_s + 14);
     const f = frames[frames.length - 1];

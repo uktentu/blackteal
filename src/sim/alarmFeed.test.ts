@@ -131,7 +131,21 @@ describe('priority sort', () => {
     expect(groups[groups.length - 1].shelved).toBe(true);
   });
 
-  it('sinks acknowledged rows below unacknowledged ones', () => {
+  it('keeps an ACKNOWLEDGED critical above an unacknowledged warning', () => {
+    // Regression: ack once outranked severity, so acknowledging the top critical pushed it
+    // below two warnings — the act of triaging the list hid the worst alarm.
+    const site = siteWith({ 'SKID-1': [crit('COMMS_LOST')], 'SKID-2': [warn('TEMP_HIGH')] });
+    const groups = groupAlarms(site, {
+      ...NO_OPTS,
+      acknowledged: new Set(['SKID-1:COMMS_LOST']),
+    });
+
+    expect(groups[0].severity).toBe('critical');
+    expect(groups[0].acknowledged).toBe(true);
+    expect(groups[1].severity).toBe('warning');
+  });
+
+  it('sinks acknowledged rows below unacknowledged ones of the SAME severity', () => {
     const site = siteWith({ 'SKID-1': [crit('CELL_OV')], 'SKID-2': [crit('CELL_UV')] });
     const groups = groupAlarms(site, {
       ...NO_OPTS,

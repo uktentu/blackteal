@@ -11,7 +11,7 @@
 
 import { memo } from 'react';
 import { EVENT_LABEL, type AlarmEvent } from '../sim/alarmHistory';
-import { fmtClock } from './format';
+import { fmtClock, fmtDate } from './format';
 import './eventlog.css';
 
 interface Props {
@@ -35,7 +35,10 @@ export const EventLog = memo(function EventLog({ events, assetId = null }: Props
     <ul className="events">
       {events.map((e) => (
         <li key={e.seq} className="event" data-kind={e.kind} data-severity={e.severity}>
-          <span className="event-time metric">{fmtClock(e.at)}</span>
+          <span className="event-time metric">
+            <span className="event-date">{fmtDate(e.at)} </span>
+            {fmtClock(e.at)}
+          </span>
           <span className="event-kind">{EVENT_LABEL[e.kind]}</span>
           {assetId === null && <span className="event-asset metric">{e.assetId}</span>}
           <span className="event-code metric">{e.code}</span>
