@@ -1,0 +1,99 @@
+/**
+ * ISA-101 / High-Performance HMI design tokens.
+ * Full rationale and the motion budget: .claude/references/isa-101-hphmi.md
+ *
+ * The rule that governs every value below: the screen stays calm neutral gray, and color
+ * means "look here now." Muted for warning, saturated for critical.
+ */
+
+:root {
+  /* Surfaces — the calm 90% of the screen. Charcoal, not pure black (halation). */
+  --bt-bg: #1b1f24;
+  --bt-surface: #22272e;
+  --bt-surface-raised: #2b313a;
+  --bt-border: #3a424d;
+  --bt-border-strong: #4d5764;
+
+  /* Text */
+  --bt-text: #e3e7ec;
+  --bt-text-muted: #9aa4b1;
+  --bt-text-faint: #6b7583;
+
+  /* Status — the only saturated things on screen.
+     NORMAL is deliberately gray, not green: six green skids would compete with the one
+     amber skid that actually needs attention. */
+  --bt-normal: #6b7583;
+  --bt-warning: #b8863b;
+  --bt-warning-dim: #4a3a20;
+  --bt-fault: #d9453c;
+  --bt-fault-dim: #4a1f1c;
+  --bt-offline: #5a6472; /* rendered as a dashed border, never as a fill */
+
+  /* Power flow on the connections */
+  --bt-flow: #5b7a99;
+
+  /* Motion budget */
+  --bt-t-state: 275ms; /* state crossfade — the only motion that should draw the eye */
+  --bt-t-row: 200ms; /* alarm row enter/exit */
+  --bt-t-drawer: 250ms; /* drawer slide, no bounce */
+
+  --bt-sans: ui-sans-serif, system-ui, 'Segoe UI', Roboto, sans-serif;
+  --bt-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  font: 15px/1.5 var(--bt-sans);
+  color-scheme: dark;
+  color: var(--bt-text);
+  background: var(--bt-bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100svh;
+  background: var(--bt-bg);
+}
+
+/* Every metric value. Proportional digits make numbers dance on each tick, which reads
+   as instability on a monitoring surface. */
+.metric-value,
+[data-metric] {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  font-family: var(--bt-mono);
+}
+
+main {
+  padding: 2rem;
+}
+
+h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--bt-text);
+  margin: 0 0 1rem;
+}
+
+p {
+  color: var(--bt-text-muted);
+  max-width: 60ch;
+  margin: 0 0 0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
