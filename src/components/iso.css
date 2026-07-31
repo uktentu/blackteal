@@ -434,3 +434,56 @@
 .iso-tip-alarm[data-severity='warning'] {
   border-left-color: var(--bt-warning);
 }
+
+/* Lattice members: legs read strongest, bracing recedes, insulators are hairlines. */
+.iso-pylon-brace {
+  fill: none;
+  stroke: var(--bt-text-faint);
+  stroke-width: 0.55;
+  opacity: 0.5;
+}
+
+.iso-pylon-insulator {
+  fill: none;
+  stroke: var(--bt-text-muted);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  opacity: 0.8;
+}
+
+/* Conductors sag toward the substation — the one curve in an otherwise straight scene. */
+.iso-conductor {
+  fill: none;
+  stroke: var(--bt-text-faint);
+  stroke-width: 0.7;
+  opacity: 0.45;
+}
+
+/**
+ * Opening reveal.
+ *
+ * Components fade and rise into place in physical order, back to front, while the whole scene
+ * swings from an off-square yaw to isometric. The point is to introduce the site — where each
+ * thing stands relative to the others — not to decorate.
+ */
+.iso-in {
+  animation: iso-arrive 620ms var(--bt-ease) backwards;
+}
+
+@keyframes iso-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+/* Once settled the scene is static; nothing here animates during normal operation. */
+.iso:not([data-intro]) .iso-in {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .iso-in {
+    animation: none;
+  }
+}

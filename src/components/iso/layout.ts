@@ -56,16 +56,22 @@ export const SUB_BUSHINGS: Box[] = [
  * this scale reads as a grey blob, and the figure draws it as a wireframe too.
  */
 export const PYLON = {
-  /** Base corners and apex, in world space. */
+  /** Footprint centre. */
   x: 276,
   z: 20,
+  /** Half-width at the base, tapering to `topHalf` at the waist. */
   baseHalf: 16,
+  topHalf: 5,
   height: 74,
-  /** Cross-arm heights and half-spans. */
+  /** Heights of the horizontal bracing bands, as a fraction of total height. */
+  bands: [0, 0.16, 0.33, 0.5, 0.66, 0.8, 0.9, 1],
+  /** Cross-arms: height, half-span, and how far the insulator strings hang. */
   arms: [
-    { y: 46, half: 25 },
-    { y: 59, half: 20 },
+    { y: 47, half: 26, drop: 7 },
+    { y: 60, half: 21, drop: 6 },
   ],
+  /** Peak above the top band. */
+  peak: 9,
 };
 
 /** Where the feeder trenches run, drawn flat on the ground. */

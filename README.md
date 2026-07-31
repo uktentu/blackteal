@@ -27,7 +27,9 @@ No backend, no accounts, no database — the live feed is simulated in the brows
 
 **Site 3D** (default) — an isometric site plan mirroring the brief's Figure 1: the data-centre hall, six
 containerised skids, the substation transformer and the transmission pylon, with an orange "+"
-on everything inspectable. Status rides the container roof strips, so the physical model answers
+on everything inspectable. It opens with a reveal — the scene swings from an off-square yaw to
+isometric while components arrive back to front — which introduces where each thing physically
+stands before any data is read. Status rides the container roof strips, so the physical model answers
 "which box do I walk to?" the way the schematic answers "what is connected to what".
 
 **Diagram** — the ISA-101 single-line schematic: how the plant is connected, at the density an

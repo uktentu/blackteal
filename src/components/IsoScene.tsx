@@ -67,7 +67,7 @@ const SCENE = screenBounds([
   ...boxCorners(LOAD_BOX),
   ...Object.values(SKID_BOXES).flatMap(boxCorners),
   ...boxCorners(SUB_PAD),
-  project(PYLON.x, PYLON.height, PYLON.z),
+  project(PYLON.x, PYLON.height + PYLON.peak, PYLON.z),
 ]);
 
 /** Label gutters: generous left and right, a band on top for the skid group label. */
@@ -88,14 +88,66 @@ const VIEW = {
  * in empty air just above the site.
  */
 const SKID_LABEL_ANCHOR = topCentre(SKID_BOXES['SKID-2']);
+
+/** Yaw the scene starts at, swinging back to square during the intro. */
+const INTRO_YAW = -0.42;
+const INTRO_MS = 1500;
+
+/** Cubic ease-out: quick commitment, gentle settle — a machine coming to rest, not a bounce. */
+const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
+
+/**
+ * Drives the opening reveal.
+ *
+ * Returns the live yaw and a 0..1 progress the staggered element reveals key off. Honours
+ * prefers-reduced-motion by jumping straight to the settled state — an unrequested intro
+ * animation is exactly what that setting exists to suppress.
+ */
+function useIntro(active: boolean) {
+  const reduced =
+    typeof window !== 'undefined' &&
+    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+
+  const [t, setT] = useState(active && !reduced ? 0 : 1);
+
+  useEffect(() => {
+    if (!active || reduced) {
+      setT(1);
+      return;
+    }
+    let raf = 0;
+    const start = performance.now();
+    const step = (now: number) => {
+      const p = Math.min(1, (now - start) / INTRO_MS);
+      setT(p);
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [active, reduced]);
+
+  return { t, yaw: INTRO_YAW * (1 - easeOut(t)), done: t >= 1 };
+}
 const SKID_LABEL_X = SKID_LABEL_ANCHOR.x;
 
 /** A solid, shaded box. Three faces only — the other three never face this camera. */
-function Solid({ box, cls, shadow = true }: { box: Box; cls: string; shadow?: boolean }) {
-  const f = boxFaces(box);
+function Solid({
+  box,
+  cls,
+  yaw = 0,
+  delay = 0,
+  shadow = true,
+}: {
+  box: Box;
+  cls: string;
+  yaw?: number;
+  delay?: number;
+  shadow?: boolean;
+}) {
+  const f = boxFaces(box, yaw);
   return (
-    <g className={cls}>
-      {shadow && <polygon className="iso-shadow" points={groundShadow(box)} />}
+    <g className={`${cls} iso-in`} style={{ animationDelay: `${delay}ms` }}>
+      {shadow && <polygon className="iso-shadow" points={groundShadow(box, 2.5, yaw)} />}
       <polygon className="iso-face iso-left" points={f.left} />
       <polygon className="iso-face iso-right" points={f.right} />
       <polygon className="iso-face iso-top" points={f.top} />
@@ -104,21 +156,21 @@ function Solid({ box, cls, shadow = true }: { box: Box; cls: string; shadow?: bo
 }
 
 /** Site grid on the slab — surveyor's lines, faint enough to read as texture. */
-function GroundGrid() {
+function GroundGrid({ yaw }: { yaw: number }) {
   const step = 26;
   const lines: string[] = [];
   for (let x = GROUND.x; x <= GROUND.x + GROUND.w + 0.1; x += step) {
-    const a = project(x, 0.02, GROUND.z);
-    const b = project(x, 0.02, GROUND.z + GROUND.d);
+    const a = project(x, 0.02, GROUND.z, yaw);
+    const b = project(x, 0.02, GROUND.z + GROUND.d, yaw);
     lines.push(`M${a.x.toFixed(1)} ${a.y.toFixed(1)} L${b.x.toFixed(1)} ${b.y.toFixed(1)}`);
   }
   for (let z = GROUND.z; z <= GROUND.z + GROUND.d + 0.1; z += step) {
-    const a = project(GROUND.x, 0.02, z);
-    const b = project(GROUND.x + GROUND.w, 0.02, z);
+    const a = project(GROUND.x, 0.02, z, yaw);
+    const b = project(GROUND.x + GROUND.w, 0.02, z, yaw);
     lines.push(`M${a.x.toFixed(1)} ${a.y.toFixed(1)} L${b.x.toFixed(1)} ${b.y.toFixed(1)}`);
   }
   return (
-    <g className="iso-grid" aria-hidden="true">
+    <g className="iso-grid iso-in" aria-hidden="true" style={{ animationDelay: '120ms' }}>
       {lines.map((d) => (
         <path key={d} d={d} />
       ))}
@@ -130,6 +182,8 @@ interface AssetProps {
   id: string;
   box: Box;
   asset: Asset;
+  yaw: number;
+  delay: number;
   selected: boolean;
   flashed: boolean;
   stale: boolean;
@@ -142,18 +196,19 @@ interface AssetProps {
  * changes one skid leaves the rest of the scene untouched.
  */
 const IsoAsset = memo(
-  function IsoAsset({ id, box, asset, selected, flashed, stale, onSelect, onHover }: AssetProps) {
+  function IsoAsset({ id, box, asset, yaw, delay, selected, flashed, stale, onSelect, onHover }: AssetProps) {
     const state: AssetState = asset.state;
-    const f = boxFaces(box);
-    const c = topCentre(box);
+    const f = boxFaces(box, yaw);
+    const c = topCentre(box, yaw);
     const label = TOPOLOGY.assets.find((a) => a.id === id)?.label ?? id;
 
     // The status strip runs along the roof edge, exactly as the figure draws it.
-    const strip = quad(box.x, box.y + box.h + 0.05, box.z, box.w, 3.6);
+    const strip = quad(box.x, box.y + box.h + 0.05, box.z, box.w, 3.6, yaw);
 
     return (
       <g
-        className="iso-asset"
+        className="iso-asset iso-in"
+        style={{ animationDelay: `${delay}ms` }}
         data-state={state}
         data-selected={selected || undefined}
         data-flashed={flashed || undefined}
@@ -173,7 +228,7 @@ const IsoAsset = memo(
         role="button"
         aria-label={`${label}, ${STATE_LABEL[state]}`}
       >
-        <polygon className="iso-shadow" points={groundShadow(box)} />
+        <polygon className="iso-shadow" points={groundShadow(box, 2.5, yaw)} />
         <polygon className="iso-face iso-left" points={f.left} />
         <polygon className="iso-face iso-right" points={f.right} />
         <polygon className="iso-face iso-top" points={f.top} />
@@ -191,50 +246,129 @@ const IsoAsset = memo(
     a.asset === b.asset &&
     a.selected === b.selected &&
     a.flashed === b.flashed &&
-    a.stale === b.stale,
+    a.stale === b.stale &&
+    // Re-render through the intro; once settled, yaw stops changing and memoization resumes.
+    a.yaw === b.yaw,
 );
 
-/** Lattice transmission tower, drawn as a wireframe like the figure's. */
-function Pylon() {
-  const { x, z, baseHalf: bh, height, arms } = PYLON;
-  const apexHalf = 4;
+/**
+ * Lattice transmission tower.
+ *
+ * Built as a real truss rather than four lines: tapered legs, horizontal bracing bands, and
+ * X-bracing in every bay between them, which is what makes a pylon read as a pylon. Cross-arms
+ * carry hanging insulator strings, and the conductors run off toward the substation.
+ */
+function Pylon({ yaw }: { yaw: number }) {
+  const { x, z, baseHalf, topHalf, height, bands, arms, peak } = PYLON;
+  const p = (px: number, py: number, pz: number) => project(px, py, pz, yaw);
+  const seg = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+    `M${a.x.toFixed(2)} ${a.y.toFixed(2)} L${b.x.toFixed(2)} ${b.y.toFixed(2)}`;
 
-  const legs = [
-    [-bh, -bh],
-    [bh, -bh],
-    [bh, bh],
-    [-bh, bh],
-  ].map(([dx, dz]) => {
-    const foot = project(x + dx, 0, z + dz);
-    const top = project(x + dx * (apexHalf / bh), height, z + dz * (apexHalf / bh));
-    return `M${foot.x.toFixed(2)} ${foot.y.toFixed(2)} L${top.x.toFixed(2)} ${top.y.toFixed(2)}`;
-  });
-
-  // Horizontal bracing rings up the tower.
-  const rings = [0.22, 0.45, 0.68, 0.88].map((t) => {
+  /** Half-width at a given height fraction — linear taper. */
+  const halfAt = (t: number) => baseHalf + (topHalf - baseHalf) * t;
+  /** The four leg positions at a height fraction. */
+  const cornersAt = (t: number) => {
+    const s = halfAt(t);
     const y = height * t;
-    const s = bh * (1 - t) + apexHalf * t;
-    return polygon([
-      project(x - s, y, z - s),
-      project(x + s, y, z - s),
-      project(x + s, y, z + s),
-      project(x - s, y, z + s),
-    ]);
-  });
+    return [
+      p(x - s, y, z - s),
+      p(x + s, y, z - s),
+      p(x + s, y, z + s),
+      p(x - s, y, z + s),
+    ];
+  };
+
+  const rings = bands.map((t) => polygon(cornersAt(t)));
+
+  // Legs: one continuous path per corner, following the taper through every band.
+  const legs = [0, 1, 2, 3].map((corner) =>
+    bands
+      .map((t, i) => {
+        const c = cornersAt(t)[corner];
+        return `${i === 0 ? 'M' : 'L'}${c.x.toFixed(2)} ${c.y.toFixed(2)}`;
+      })
+      .join(' '),
+  );
+
+  // X-bracing: both diagonals across each bay, on the two faces the camera can see.
+  const braces: string[] = [];
+  for (let i = 0; i < bands.length - 1; i++) {
+    const lower = cornersAt(bands[i]);
+    const upper = cornersAt(bands[i + 1]);
+    for (const [a, b] of [
+      [1, 2],
+      [2, 3],
+    ] as const) {
+      braces.push(seg(lower[a], upper[b]), seg(lower[b], upper[a]));
+    }
+  }
+
+  const apex = p(x, height + peak, z);
+  const topRing = cornersAt(1);
 
   return (
     <g className="iso-pylon" aria-hidden="true">
-      {rings.map((r) => (
-        <polygon key={r} className="iso-pylon-ring" points={r} />
+      {rings.map((r, i) => (
+        <polygon key={`r${i}`} className="iso-pylon-ring" points={r} />
       ))}
-      {legs.map((d) => (
-        <path key={d} className="iso-pylon-leg" d={d} />
+      {braces.map((d, i) => (
+        <path key={`b${i}`} className="iso-pylon-brace" d={d} />
       ))}
+      {legs.map((d, i) => (
+        <path key={`l${i}`} className="iso-pylon-leg" d={d} />
+      ))}
+
+      {/* Peak */}
+      {topRing.map((c, i) => (
+        <path key={`p${i}`} className="iso-pylon-brace" d={seg(c, apex)} />
+      ))}
+
+      {/* Cross-arms with hanging insulator strings and their conductors. */}
       {arms.map((a) => {
-        const l = project(x - a.half, a.y, z);
-        const r = project(x + a.half, a.y, z);
-        return <path key={a.y} className="iso-pylon-arm" d={`M${l.x} ${l.y} L${r.x} ${r.y}`} />;
+        const l = p(x - a.half, a.y, z);
+        const r = p(x + a.half, a.y, z);
+        const cl = p(x - a.half * 0.45, a.y, z);
+        const cr = p(x + a.half * 0.45, a.y, z);
+        const hangers = [
+          [x - a.half, a.y],
+          [x + a.half, a.y],
+          [x - a.half * 0.45, a.y],
+          [x + a.half * 0.45, a.y],
+        ] as const;
+
+        return (
+          <g key={a.y}>
+            <path className="iso-pylon-arm" d={seg(l, r)} />
+            {/* Triangulation back to the mast, so the arm doesn't look glued on. */}
+            <path className="iso-pylon-brace" d={seg(l, p(x, a.y + 9, z))} />
+            <path className="iso-pylon-brace" d={seg(r, p(x, a.y + 9, z))} />
+            <path className="iso-pylon-brace" d={seg(cl, p(x, a.y + 5, z))} />
+            <path className="iso-pylon-brace" d={seg(cr, p(x, a.y + 5, z))} />
+            {hangers.map(([hx, hy], i) => (
+              <path
+                key={`h${i}`}
+                className="iso-pylon-insulator"
+                d={seg(p(hx, hy, z), p(hx, hy - a.drop, z))}
+              />
+            ))}
+          </g>
+        );
       })}
+
+      {/* Conductors running off toward the substation. */}
+      {arms.map((a) =>
+        [-1, 1].map((sgn) => {
+          const from = p(x + sgn * a.half, a.y - a.drop, z);
+          const to = p(x - 74, a.y - a.drop - 10 + sgn * 3, z + sgn * 6);
+          return (
+            <path
+              key={`c${a.y}${sgn}`}
+              className="iso-conductor"
+              d={`M${from.x.toFixed(2)} ${from.y.toFixed(2)} Q${((from.x + to.x) / 2).toFixed(2)} ${((from.y + to.y) / 2 + 7).toFixed(2)} ${to.x.toFixed(2)} ${to.y.toFixed(2)}`}
+            />
+          );
+        }),
+      )}
     </g>
   );
 }
@@ -249,6 +383,7 @@ interface Props {
 
 export function IsoScene({ site, selectedId, flashedId, stale, onSelect }: Props) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const { t: intro, yaw, done: introDone } = useIntro(true);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState({ cw: 0, ch: 0 });
 
@@ -283,13 +418,13 @@ export function IsoScene({ site, selectedId, flashedId, stale, onSelect }: Props
   const feeders = useMemo(
     () =>
       Object.entries(SKID_BOXES).map(([id, b]) => {
-        const from = project(SUB_PAD.x, FEEDER_Y, b.z + b.d / 2);
-        const to = project(b.x + b.w, FEEDER_Y, b.z + b.d / 2);
-        const out = project(b.x, FEEDER_Y, b.z + b.d / 2);
-        const load = project(LOAD_BOX.x + LOAD_BOX.w, FEEDER_Y, b.z + b.d / 2);
+        const from = project(SUB_PAD.x, FEEDER_Y, b.z + b.d / 2, yaw);
+        const to = project(b.x + b.w, FEEDER_Y, b.z + b.d / 2, yaw);
+        const out = project(b.x, FEEDER_Y, b.z + b.d / 2, yaw);
+        const load = project(LOAD_BOX.x + LOAD_BOX.w, FEEDER_Y, b.z + b.d / 2, yaw);
         return { id, feed: `M${from.x} ${from.y} L${to.x} ${to.y}`, tap: `M${out.x} ${out.y} L${load.x} ${load.y}` };
       }),
-    [],
+    [yaw],
   );
 
   const hovered = hoveredId !== null && hoveredId !== selectedId ? hoveredId : null;
@@ -303,17 +438,19 @@ export function IsoScene({ site, selectedId, flashedId, stale, onSelect }: Props
         role="group"
         aria-label="Isometric site view"
         data-stale={stale || undefined}
+        data-intro={!introDone || undefined}
+        style={{ '--intro': intro } as React.CSSProperties}
       >
         {/* ground */}
-        <g className="iso-ground">
-          <polygon className="iso-ground-side" points={boxFaces(GROUND).right} />
-          <polygon className="iso-ground-side" points={boxFaces(GROUND).left} />
-          <polygon className="iso-ground-top" points={boxFaces(GROUND).top} />
+        <g className="iso-ground iso-in" style={{ animationDelay: '0ms' }}>
+          <polygon className="iso-ground-side" points={boxFaces(GROUND, yaw).right} />
+          <polygon className="iso-ground-side" points={boxFaces(GROUND, yaw).left} />
+          <polygon className="iso-ground-top" points={boxFaces(GROUND, yaw).top} />
         </g>
-        <GroundGrid />
+        <GroundGrid yaw={yaw} />
 
         {/* feeder runs, under everything */}
-        <g className="iso-feeders" aria-hidden="true">
+        <g className="iso-feeders iso-in" aria-hidden="true" style={{ animationDelay: '1220ms' }}>
           {feeders.map((f) => (
             <g key={f.id}>
               <path className="iso-feeder" d={f.feed} />
@@ -322,26 +459,32 @@ export function IsoScene({ site, selectedId, flashedId, stale, onSelect }: Props
           ))}
         </g>
 
-        <Pylon />
+        <g className="iso-in" style={{ animationDelay: '240ms' }}>
+          <Pylon yaw={yaw} />
+        </g>
 
         {/* substation structure that isn't itself the clickable asset */}
-        <Solid box={SUB_PAD} cls="iso-pad" />
+        <Solid box={SUB_PAD} cls="iso-pad" yaw={yaw} delay={340} />
         {SUB_RADS.map((b) => (
-          <Solid key={`${b.x}`} box={b} cls="iso-kit" />
+          <Solid key={`${b.x}`} box={b} cls="iso-kit" yaw={yaw} delay={380} />
         ))}
 
         {/* data-centre outbuildings */}
-        <Solid box={LOAD_ANNEX} cls="iso-kit" />
-        {LOAD_PLANT.map((b) => (
-          <Solid key={`${b.x}-${b.z}`} box={b} cls="iso-kit" />
+        <Solid box={LOAD_ANNEX} cls="iso-kit" yaw={yaw} delay={1020} />
+        {LOAD_PLANT.map((b, i) => (
+          <Solid key={`${b.x}-${b.z}`} box={b} cls="iso-kit" yaw={yaw} delay={1060 + i * 50} />
         ))}
 
         {/* the inspectable assets, back to front */}
-        {ordered.map(({ id, box }) => (
+        {ordered.map(({ id, box }, i) => (
           <IsoAsset
             key={id}
             id={id}
             box={box}
+            yaw={yaw}
+            /* Components arrive in physical order, back to front, so the eye is walked
+               across the site rather than shown everything at once. */
+            delay={420 + i * 85}
             asset={site.assets[id]}
             selected={selectedId === id}
             flashed={flashedId === id}
@@ -352,8 +495,8 @@ export function IsoScene({ site, selectedId, flashedId, stale, onSelect }: Props
         ))}
 
         {/* bushings sit on top of the transformer, so they paint after it */}
-        {SUB_BUSHINGS.map((b) => (
-          <Solid key={`${b.x}`} box={b} cls="iso-kit" />
+        {SUB_BUSHINGS.map((b, i) => (
+          <Solid key={`${b.x}`} box={b} cls="iso-kit" yaw={yaw} delay={400 + i * 40} shadow={false} />
         ))}
 
         {/*
@@ -362,7 +505,7 @@ export function IsoScene({ site, selectedId, flashedId, stale, onSelect }: Props
           leader from cutting diagonally across the site.
         */}
         {Object.entries(LABELS).map(([id, l]) => {
-          const c = topCentre(ASSET_BOX[id]);
+          const c = topCentre(ASSET_BOX[id], yaw);
           const left = id === 'LOAD';
           const anchorX = left ? SCENE.minX - 14 : SCENE.maxX + 14;
           // Clamped into the gutter: deriving the height purely from the asset pushed the
@@ -371,7 +514,12 @@ export function IsoScene({ site, selectedId, flashedId, stale, onSelect }: Props
           const elbowX = left ? anchorX + 34 : anchorX - 34;
 
           return (
-            <g key={id} className="iso-label" aria-hidden="true">
+            <g
+              key={id}
+              className="iso-label iso-in"
+              aria-hidden="true"
+              style={{ animationDelay: '1320ms' }}
+            >
               <path
                 className="iso-leader"
                 d={`M${anchorX.toFixed(1)} ${anchorY.toFixed(1)} H${elbowX.toFixed(1)} L${c.x.toFixed(1)} ${(c.y - 15).toFixed(1)}`}
@@ -398,7 +546,7 @@ export function IsoScene({ site, selectedId, flashedId, stale, onSelect }: Props
         })}
 
         {/* Skid group label, centred over the two rows in the top gutter. */}
-        <g className="iso-label" aria-hidden="true">
+        <g className="iso-label iso-in" aria-hidden="true" style={{ animationDelay: '1320ms' }}>
           <text className="iso-label-title" x={SKID_LABEL_X} y={VIEW.y + 22} textAnchor="middle">
             BESS Skids
           </text>
