@@ -1,0 +1,268 @@
+/**
+ * Isometric site view.
+ *
+ * Materials stay in the neutral tier — the buildings are grey concrete and steel, exactly as
+ * ISA-101 wants the calm 90% of the screen to be. Colour appears in only two places: the roof
+ * status strip and the orange "+" affordance. A site with nothing wrong is a grey model.
+ */
+
+.iso-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+}
+
+.iso {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 620px;
+  min-height: 320px;
+}
+
+/* ---- shared face shading: one light direction across the whole scene ---- */
+
+.iso-face {
+  stroke: var(--bt-rule);
+  stroke-width: 0.6;
+  stroke-linejoin: round;
+  transition: fill var(--bt-t-state) var(--bt-ease);
+}
+
+.iso-top {
+  fill: #333b45;
+}
+.iso-right {
+  fill: #262d35;
+}
+.iso-left {
+  fill: #1e242b;
+}
+
+/* ---- ground ---- */
+
+.iso-ground-top {
+  fill: #20262d;
+  stroke: var(--bt-rule);
+  stroke-width: 0.6;
+}
+
+.iso-ground-side {
+  fill: #171c22;
+  stroke: var(--bt-rule);
+  stroke-width: 0.6;
+}
+
+/* ---- ancillary structures: pads, radiators, rooftop plant ---- */
+
+.iso-kit .iso-top {
+  fill: #2b323b;
+}
+.iso-kit .iso-right {
+  fill: #212830;
+}
+.iso-kit .iso-left {
+  fill: #1a2027;
+}
+
+.iso-pad .iso-top {
+  fill: #242b33;
+}
+.iso-pad .iso-right,
+.iso-pad .iso-left {
+  fill: #1b2128;
+}
+
+/* ---- feeder runs on the ground ---- */
+
+.iso-feeder {
+  fill: none;
+  stroke: var(--bt-flow);
+  stroke-width: 1.1;
+  stroke-dasharray: 3 5;
+  opacity: 0.5;
+  animation: iso-flow 1.6s linear infinite;
+}
+
+@keyframes iso-flow {
+  to {
+    stroke-dashoffset: -16;
+  }
+}
+
+.iso[data-stale] .iso-feeder {
+  animation: none;
+  opacity: 0.18;
+}
+
+/* ---- transmission pylon ---- */
+
+.iso-pylon-leg,
+.iso-pylon-arm {
+  fill: none;
+  stroke: var(--bt-text-faint);
+  stroke-width: 1.1;
+  stroke-linecap: round;
+}
+
+.iso-pylon-ring {
+  fill: none;
+  stroke: var(--bt-text-faint);
+  stroke-width: 0.8;
+  opacity: 0.65;
+}
+
+/* ---- inspectable assets ---- */
+
+.iso-asset {
+  cursor: pointer;
+}
+
+.iso-asset:focus {
+  outline: none;
+}
+
+.iso-asset:hover .iso-top {
+  fill: #3d4650;
+}
+
+/**
+ * The roof strip is the status channel, matching Figure 1's coloured container roofs.
+ * It is the only saturated surface in the scene.
+ */
+.iso-strip {
+  stroke: none;
+  transition: fill var(--bt-t-state) var(--bt-ease);
+}
+
+.iso-asset[data-state='NORMAL'] .iso-strip {
+  /* A muted green here, not on the diagram: one strip per asset in a physical model reads as
+     equipment livery rather than as six competing signals. */
+  fill: #4e7a5a;
+}
+
+.iso-asset[data-state='WARNING'] .iso-strip {
+  fill: var(--bt-warning);
+}
+
+.iso-asset[data-state='FAULT'] .iso-strip {
+  fill: var(--bt-fault);
+  animation: iso-pulse 1.8s ease-in-out infinite;
+}
+
+.iso-asset[data-state='OFFLINE'] .iso-strip {
+  fill: var(--bt-offline);
+  opacity: 0.5;
+}
+
+/* Offline also loses its solidity — the shell is there, the data is not. */
+.iso-asset[data-state='OFFLINE'] .iso-face {
+  fill: transparent;
+  stroke: var(--bt-offline);
+  stroke-dasharray: 3 2.5;
+}
+
+@keyframes iso-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* ---- selection and alarm-jump flash ---- */
+
+.iso-asset[data-selected] .iso-face,
+.iso-asset[data-flashed] .iso-face {
+  stroke: var(--bt-accent);
+  stroke-width: 1.4;
+}
+
+.iso-asset:focus-visible .iso-face {
+  stroke: var(--bt-accent);
+  stroke-width: 1.4;
+}
+
+.iso-asset[data-flashed] .iso-face {
+  animation: iso-flash 900ms var(--bt-ease) 2;
+}
+
+@keyframes iso-flash {
+  0%,
+  100% {
+    stroke-opacity: 1;
+  }
+  50% {
+    stroke-opacity: 0.25;
+  }
+}
+
+/* ---- click-to-inspect marker ---- */
+
+.iso-plus-bg {
+  fill: var(--bt-accent);
+}
+
+.iso-plus-mark {
+  stroke: #fff;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.iso-plus {
+  opacity: 0.9;
+  transition: opacity var(--bt-t-state) var(--bt-ease);
+}
+
+.iso-asset:hover .iso-plus,
+.iso-asset:focus-visible .iso-plus,
+.iso-asset[data-selected] .iso-plus {
+  opacity: 1;
+}
+
+/* Offline assets are still inspectable — that is where the operator must look. */
+.iso[data-stale] .iso-plus {
+  opacity: 0.35;
+}
+
+/* ---- leader-line labels ---- */
+
+.iso-leader {
+  fill: none;
+  stroke: var(--bt-rule-strong);
+  stroke-width: 0.8;
+}
+
+.iso-leader-dot {
+  fill: var(--bt-text-muted);
+}
+
+.iso-label-title {
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--bt-text);
+}
+
+.iso-label-sub {
+  font-size: 9.5px;
+  fill: var(--bt-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- hover tooltip: screen space, so it never scales with the scene ---- */
+
+.iso-tip {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+  z-index: 6;
+  background: var(--bt-raised);
+  border: 1px solid var(--bt-rule-strong);
+  border-radius: 2px;
+  padding: 7px 10px;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 30%);
+  white-space: nowrap;
+}

@@ -14,7 +14,11 @@
 
 const KEY = 'blackteal.layout.v1';
 
+export type SiteView = 'diagram' | 'site';
+
 export interface PersistedLayout {
+  /** Which surface the operator last had open. */
+  view: SiteView;
   consoleHeight: number;
   consoleCollapsed: boolean;
   filterAssetId: string | null;
@@ -23,6 +27,8 @@ export interface PersistedLayout {
 }
 
 export const DEFAULT_LAYOUT: PersistedLayout = {
+  // The single-line diagram is the default: it is the denser, faster read for monitoring.
+  view: 'diagram',
   consoleHeight: 240,
   consoleCollapsed: false,
   filterAssetId: null,
@@ -60,6 +66,7 @@ export function loadLayout(): PersistedLayout {
     const p = parsed as Partial<PersistedLayout>;
 
     return {
+      view: p.view === 'site' ? 'site' : 'diagram',
       consoleHeight:
         typeof p.consoleHeight === 'number' && Number.isFinite(p.consoleHeight)
           ? clampConsoleHeight(p.consoleHeight)

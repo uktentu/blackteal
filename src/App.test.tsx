@@ -245,6 +245,65 @@ describe('Stage 1: alarm console', () => {
   });
 });
 
+describe('two views of one live state', () => {
+  it('starts on the single-line diagram', () => {
+    renderApp();
+    expect(screen.getByRole('group', { name: /single-line diagram/i })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: /isometric site view/i })).not.toBeInTheDocument();
+  });
+
+  it('switches to the isometric site view', async () => {
+    const { user } = renderApp();
+    await user.click(screen.getByRole('tab', { name: 'Site 3D' }));
+
+    expect(screen.getByRole('group', { name: /isometric site view/i })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: /single-line diagram/i })).not.toBeInTheDocument();
+  });
+
+  it('keeps every asset inspectable in the 3D view, with the same accessible names', async () => {
+    const { user } = renderApp();
+    await user.click(screen.getByRole('tab', { name: 'Site 3D' }));
+
+    for (const label of ['Power Skid 1', 'Power Skid 5', 'Grid / Substation', 'Data Center Load']) {
+      expect(screen.getByRole('button', { name: new RegExp(label, 'i') })).toBeInTheDocument();
+    }
+  });
+
+  it('opens the same drawer from the 3D view', async () => {
+    const { user } = renderApp();
+    await user.click(screen.getByRole('tab', { name: 'Site 3D' }));
+    await user.click(screen.getByRole('button', { name: /Power Skid 2, Warning/i }));
+
+    expect(await screen.findByRole('heading', { name: 'Power Skid 2', level: 2 })).toBeInTheDocument();
+    expect(screen.getByText('Connection health')).toBeInTheDocument();
+  });
+
+  it('carries live status onto the 3D scene', async () => {
+    const { user } = renderApp();
+    await user.click(screen.getByRole('tab', { name: 'Site 3D' }));
+
+    // Status must be readable from the model itself, not only from the alarm list.
+    const skid2 = screen.getByRole('button', { name: /Power Skid 2, Warning/i });
+    expect(skid2).toHaveAttribute('data-state', 'WARNING');
+    expect(screen.getByRole('button', { name: /Power Skid 5, Offline/i })).toHaveAttribute(
+      'data-state',
+      'OFFLINE',
+    );
+  });
+
+  it('remembers the chosen view across a remount', async () => {
+    // Asserts the contract an operator cares about — the screen comes back how they left it —
+    // rather than poking at storage internals.
+    const { user, unmount } = renderApp();
+    await user.click(screen.getByRole('tab', { name: 'Site 3D' }));
+    expect(screen.getByRole('group', { name: /isometric site view/i })).toBeInTheDocument();
+
+    unmount();
+    renderApp();
+    expect(screen.getByRole('group', { name: /isometric site view/i })).toBeInTheDocument();
+  });
+});
+
 describe('alarm console alignment', () => {
   it('uses the same column cells in both tabs, so nothing shifts when switching', async () => {
     const { user } = renderApp();

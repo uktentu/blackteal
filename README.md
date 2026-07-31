@@ -16,12 +16,30 @@ npm run dev          # http://localhost:5173
 ```
 
 ```bash
-npm test             # 134 tests: pure logic + component/interaction tests
+npm test             # 156 tests: pure logic + component/interaction tests
 npm run build        # typecheck + production build to dist/
 npm run check        # typecheck + lint + tests
 ```
 
 No backend, no accounts, no database — the live feed is simulated in the browser.
+
+## Two views of the same live state
+
+**Diagram** (default) — the ISA-101 single-line schematic: how the plant is connected, at the
+density an operator monitors from.
+
+**Site 3D** — an isometric site plan mirroring the brief's Figure 1: the data-centre hall, six
+containerised skids, the substation transformer and the transmission pylon, with an orange "+"
+on everything inspectable. Status rides the container roof strips, so the physical model answers
+"which box do I walk to?" the way the schematic answers "what is connected to what".
+
+Both are driven by one store — the same alarms, the same drawer, the same selection. Switching
+views never changes what is true, only how it is drawn, and the choice is remembered.
+
+The 3D view is plain SVG with a hand-rolled isometric projection, not WebGL. At eight objects a
+3D engine would add a dependency, a canvas no screen reader can enter, and a second rendering
+model to keep in sync — for a scene that never rotates. Every asset stays a focusable DOM
+element with the same accessible name it has in the diagram.
 
 ## What to look at first
 
@@ -160,7 +178,7 @@ click-to-open: capturing the pointer on the SVG root retargets the click away fr
 **History is in-memory only**, 60 samples per asset for the sparklines. Nothing persists across
 a reload. A real deployment reads a historian.
 
-**Component tests instead of full E2E.** 134 tests: the pure logic (simulator, rules, alarm
+**Component tests instead of full E2E.** 156 tests: the pure logic (simulator, rules, alarm
 feed, event log) plus 26 component tests driving the real DOM via Testing Library — click an
 asset opens its panel, a missing metric renders a dash, a flood groups, Escape closes. These
 exist because a zoom feature once broke click-to-open while every logic test stayed green.

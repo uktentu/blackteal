@@ -3,6 +3,7 @@ import { useSiteStore, buildSummary, buildAlarmGroups } from './store/useSiteSto
 import { loadLayout, saveLayout, clampConsoleHeight } from './store/persist';
 import { TOPOLOGY } from './domain/topology';
 import { Diagram } from './components/Diagram';
+import { IsoScene } from './components/IsoScene';
 import { TopStrip } from './components/TopStrip';
 import { DetailDrawer } from './components/DetailDrawer';
 import { Legend } from './components/Legend';
@@ -70,6 +71,11 @@ export default function App() {
       showShelved: layout.showShelved,
     });
   }, [layout, setFilters]);
+
+  const setView = useCallback(
+    (v: 'diagram' | 'site') => setLayout((l) => ({ ...l, view: v })),
+    [],
+  );
 
   const setConsoleHeight = useCallback(
     (h: number) => setLayout((l) => ({ ...l, consoleHeight: clampConsoleHeight(h) })),
@@ -205,6 +211,8 @@ export default function App() {
         stale={stale}
         staleForMs={now - lastFrameAt}
         now={now}
+        view={layout.view}
+        onView={setView}
         onSimulateBurst={() => trigger('burst')}
         onSimulateDropout={() => trigger('dropout')}
       />
@@ -220,14 +228,24 @@ export default function App() {
       <div className="app-body">
         <section className="app-diagram" aria-label="Site diagram">
           <div className="app-canvas">
-            <ErrorBoundary label="The site diagram">
-              <Diagram
-                site={site}
-                selectedId={selectedId}
-                flashedId={flashedId}
-                stale={stale}
-                onSelect={select}
-              />
+            <ErrorBoundary label="The site view">
+              {layout.view === 'site' ? (
+                <IsoScene
+                  site={site}
+                  selectedId={selectedId}
+                  flashedId={flashedId}
+                  stale={stale}
+                  onSelect={select}
+                />
+              ) : (
+                <Diagram
+                  site={site}
+                  selectedId={selectedId}
+                  flashedId={flashedId}
+                  stale={stale}
+                  onSelect={select}
+                />
+              )}
             </ErrorBoundary>
           </div>
           <Legend flowing={!stale} />

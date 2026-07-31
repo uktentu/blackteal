@@ -22,6 +22,8 @@ interface Props {
   staleForMs: number;
   /** Store clock — control rooms always show wall-clock time. */
   now: number;
+  view: 'diagram' | 'site';
+  onView: (v: 'diagram' | 'site') => void;
   onSimulateBurst: () => void;
   onSimulateDropout: () => void;
 }
@@ -35,6 +37,8 @@ export const TopStrip = memo(function TopStrip({
   stale,
   staleForMs,
   now,
+  view,
+  onView,
   onSimulateBurst,
   onSimulateDropout,
 }: Props) {
@@ -76,6 +80,26 @@ export const TopStrip = memo(function TopStrip({
               : `${needsAttention} asset${needsAttention === 1 ? '' : 's'} need attention`}
           </span>
         </span>
+
+        {/* Two views of the same live state: the schematic and the physical site plan. */}
+        <div className="viewswitch" role="tablist" aria-label="Site view">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === 'diagram'}
+            onClick={() => onView('diagram')}
+          >
+            Diagram
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === 'site'}
+            onClick={() => onView('site')}
+          >
+            Site 3D
+          </button>
+        </div>
 
         {/* Demo triggers: the brief asks for flood grouping and the stale indicator to be
             demonstrable on demand rather than something a reviewer has to wait for. */}
