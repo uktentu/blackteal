@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSiteStore, buildSummary, buildAlarmGroups } from './store/useSiteStore';
+import { loadLayout, saveLayout, clampConsoleHeight } from './store/persist';
 import { TOPOLOGY } from './domain/topology';
 import { Diagram } from './components/Diagram';
 import { TopStrip } from './components/TopStrip';
@@ -39,7 +40,36 @@ export default function App() {
   const shelve = useSiteStore((s) => s.shelve);
   const unshelve = useSiteStore((s) => s.unshelve);
 
-  const [collapsed, setCollapsed] = useState(false);
+  // Layout is restored once on mount, then written back whenever it changes.
+  const [layout, setLayout] = useState(loadLayout);
+  const { consoleHeight, consoleCollapsed } = layout;
+
+  useEffect(() => {
+    saveLayout({
+      ...layout,
+      filterAssetId: filters.assetId,
+      filterSeverity: filters.severity,
+      showShelved: filters.showShelved,
+    });
+  }, [layout, filters]);
+
+  // Apply the restored filters once the store is live.
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+    setFilters({
+      assetId: layout.filterAssetId,
+      severity: layout.filterSeverity,
+      showShelved: layout.showShelved,
+    });
+  }, [layout, setFilters]);
+
+  const setConsoleHeight = useCallback(
+    (h: number) => setLayout((l) => ({ ...l, consoleHeight: clampConsoleHeight(h) })),
+    [],
+  );
+
   const [flashedId, setFlashedId] = useState<string | null>(null);
 
   /**
@@ -142,8 +172,10 @@ export default function App() {
       <AlarmConsole
         groups={groups}
         filters={filters}
-        collapsed={collapsed}
-        onToggleCollapsed={() => setCollapsed((c) => !c)}
+        collapsed={consoleCollapsed}
+        height={consoleHeight}
+        onHeight={setConsoleHeight}
+        onToggleCollapsed={() => setLayout((l) => ({ ...l, consoleCollapsed: !l.consoleCollapsed }))}
         onFilters={setFilters}
         onAck={onAck}
         onShelve={onShelve}

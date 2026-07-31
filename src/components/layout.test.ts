@@ -2,24 +2,21 @@
  * Layout and view-box math tests — the "works at scale" evidence.
  *
  * The app renders the data pack's 8 hand-placed assets, but the layout path is exercised
- * against a synthetic 24-skid site: every asset placed, nothing overlapping, links intact.
+ * against synthetic 24- and 60-skid sites: every asset placed, nothing overlapping, links
+ * intact, and a fitted view that still contains everything.
  */
 
 import { describe, it, expect } from 'vitest';
 import { TOPOLOGY } from '../domain/topology';
-import { ensureLayout, extents, NODE_W, NODE_H, MAX_ROWS, type UnplacedTopology } from './layout';
 import {
-  zoomAt,
-  pan,
-  centerOn,
-  contains,
-  clientToDiagram,
+  ensureLayout,
+  extents,
   diagramToClient,
-  zoomLevel,
-  MAX_ZOOM,
-  MIN_ZOOM,
-  type ViewBox,
-} from './viewbox';
+  NODE_W,
+  NODE_H,
+  MAX_ROWS,
+  type UnplacedTopology,
+} from './layout';
 
 function syntheticSite(nSkids: number): UnplacedTopology {
   const skids = Array.from({ length: nSkids }, (_, i) => ({
@@ -90,47 +87,22 @@ describe('ensureLayout', () => {
   });
 });
 
-describe('view-box math', () => {
-  const base: ViewBox = { x: 0, y: 0, w: 700, h: 470 };
+describe('fit transform', () => {
+  const box = { x: 0, y: 0, w: 700, h: 470 };
 
-  it('zoom keeps the cursor point stationary', () => {
-    const vb = zoomAt(base, base, 2, 100, 100);
-    // (100,100) must map to the same relative position in the new box.
-    expect((100 - vb.x) / vb.w).toBeCloseTo(100 / base.w, 6);
-    expect((100 - vb.y) / vb.h).toBeCloseTo(100 / base.h, 6);
-    expect(zoomLevel(vb, base)).toBeCloseTo(2, 6);
+  it('accounts for the letterbox when the container aspect differs', () => {
+    // A 1000x800 container is taller than the 700x470 box, so `meet` letterboxes vertically.
+    const scale = Math.min(1000 / box.w, 800 / box.h);
+    const p = diagramToClient(box, 1000, 800, 0, 0);
+
+    expect(p.scale).toBeCloseTo(scale, 6);
+    expect(p.y).toBeCloseTo((800 - box.h * scale) / 2, 6);
+    expect(p.x).toBeCloseTo(0, 6);
   });
 
-  it('clamps zoom to the documented range', () => {
-    let vb = base;
-    for (let i = 0; i < 20; i++) vb = zoomAt(vb, base, 1.5, 350, 235);
-    expect(zoomLevel(vb, base)).toBeCloseTo(MAX_ZOOM, 6);
-
-    for (let i = 0; i < 30; i++) vb = zoomAt(vb, base, 1 / 1.5, 350, 235);
-    expect(zoomLevel(vb, base)).toBeCloseTo(MIN_ZOOM, 6);
-  });
-
-  it('never lets the diagram be panned fully out of frame', () => {
-    let vb = base;
-    for (let i = 0; i < 100; i++) vb = pan(vb, base, 500, 500);
-    // At least 20% of the view still overlaps the base extents.
-    expect(vb.x).toBeLessThanOrEqual(base.x + base.w - vb.w * 0.2);
-    expect(vb.y).toBeLessThanOrEqual(base.y + base.h - vb.h * 0.2);
-  });
-
-  it('centerOn puts the target in the middle of the view', () => {
-    const zoomed = zoomAt(base, base, 2, 350, 235);
-    const vb = centerOn(zoomed, base, 500, 300);
-    expect(vb.x + vb.w / 2).toBeCloseTo(500, 6);
-    expect(vb.y + vb.h / 2).toBeCloseTo(300, 6);
-    expect(contains(vb, 500, 300, 10)).toBe(true);
-  });
-
-  it('round-trips client and diagram coordinates through the letterbox', () => {
-    // Element aspect (1000x800) differs from view-box aspect, so `meet` letterboxes.
-    const p = clientToDiagram(base, 1000, 800, 640, 400);
-    const back = diagramToClient(base, 1000, 800, p.x, p.y);
-    expect(back.x).toBeCloseTo(640, 6);
-    expect(back.y).toBeCloseTo(400, 6);
+  it('maps the box centre to the container centre', () => {
+    const p = diagramToClient(box, 1000, 800, box.w / 2, box.h / 2);
+    expect(p.x).toBeCloseTo(500, 6);
+    expect(p.y).toBeCloseTo(400, 6);
   });
 });

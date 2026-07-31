@@ -5,14 +5,15 @@
  * not burying it — is the whole job." Everything here serves that: priority sort, ack, shelve,
  * filters, and flood grouping.
  *
- * Docked and collapsible. The severity-count header stays visible when collapsed, because the
- * counts are the part an operator needs at a glance.
+ * Docked, collapsible, and resizable by dragging its top edge. The severity-count header stays
+ * visible when collapsed, because the counts are the part an operator needs at a glance.
  */
 
-import { memo } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { TOPOLOGY } from '../domain/topology';
 import type { Severity } from '../domain/types';
 import { alarmCounts, type AlarmGroup } from '../sim/alarmFeed';
+import { clampConsoleHeight, CONSOLE_MIN, consoleMax } from '../store/persist';
 import type { AlarmFilters } from '../store/useSiteStore';
 import './console.css';
 
@@ -20,6 +21,8 @@ interface Props {
   groups: AlarmGroup[];
   filters: AlarmFilters;
   collapsed: boolean;
+  height: number;
+  onHeight: (h: number) => void;
   onToggleCollapsed: () => void;
   onFilters: (patch: Partial<AlarmFilters>) => void;
   onAck: (group: AlarmGroup) => void;
@@ -32,6 +35,8 @@ export const AlarmConsole = memo(function AlarmConsole({
   groups,
   filters,
   collapsed,
+  height,
+  onHeight,
   onToggleCollapsed,
   onFilters,
   onAck,
@@ -40,9 +45,104 @@ export const AlarmConsole = memo(function AlarmConsole({
   onFocusAsset,
 }: Props) {
   const counts = alarmCounts(groups);
+  const listRef = useRef<HTMLDivElement | null>(null);
+
+  /**
+   * SAFETY: the rendered order is frozen while the operator is working in the list.
+   *
+   * The feed re-sorts every second. Without this, a row can slide out from under the pointer
+   * between the decision to click Ack and the click landing — and the operator acknowledges a
+   * different alarm than the one they read. Rows keep their positions while the pointer or
+   * keyboard focus is inside the list, and re-sort the moment it leaves.
+   *
+   * New alarms are never hidden by the freeze: unknown ids are appended, so an arrival during
+   * an interaction still shows up, just at the bottom until the order settles.
+   */
+  const [frozen, setFrozen] = useState(false);
+  const orderRef = useRef<string[]>([]);
+
+  if (!frozen) {
+    orderRef.current = groups.map((g) => g.id);
+  }
+
+  const ordered = frozen
+    ? [
+        ...orderRef.current
+          .map((id) => groups.find((g) => g.id === id))
+          .filter((g): g is AlarmGroup => g !== undefined),
+        ...groups.filter((g) => !orderRef.current.includes(g.id)),
+      ]
+    : groups;
+
+  // ---- resize by dragging the top edge ----
+  const drag = useRef<{ y: number; h: number } | null>(null);
+
+  const onHandleDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    drag.current = { y: e.clientY, h: height };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const onHandleMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (d === null) return;
+    // Dragging up grows the console, which is why the delta is inverted.
+    onHeight(clampConsoleHeight(d.h + (d.y - e.clientY)));
+  };
+
+  const onHandleUp = () => {
+    drag.current = null;
+  };
+
+  /** Keyboard resize, so the handle isn't pointer-only. */
+  const onHandleKey = (e: React.KeyboardEvent) => {
+    const step = e.shiftKey ? 48 : 16;
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      onHeight(clampConsoleHeight(height + step));
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      onHeight(clampConsoleHeight(height - step));
+    }
+  };
+
+  // A stored height taller than the current viewport must be brought back into range.
+  useEffect(() => {
+    const onResize = () => onHeight(clampConsoleHeight(height));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [height, onHeight]);
+
+  const freeze = useCallback(() => setFrozen(true), []);
+  const thaw = useCallback(() => setFrozen(false), []);
 
   return (
-    <section className="console" data-collapsed={collapsed || undefined} aria-label="Alarm console">
+    <section
+      className="console"
+      data-collapsed={collapsed || undefined}
+      style={collapsed ? undefined : { height }}
+      aria-label="Alarm console"
+    >
+      {!collapsed && (
+        <div
+          className="console-handle"
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize alarm console"
+          aria-valuenow={height}
+          aria-valuemin={CONSOLE_MIN}
+          aria-valuemax={consoleMax()}
+          tabIndex={0}
+          onPointerDown={onHandleDown}
+          onPointerMove={onHandleMove}
+          onPointerUp={onHandleUp}
+          onPointerCancel={onHandleUp}
+          onKeyDown={onHandleKey}
+        >
+          <span className="console-grip" aria-hidden="true" />
+        </div>
+      )}
+
       <header className="console-head">
         <button
           type="button"
@@ -65,21 +165,36 @@ export const AlarmConsole = memo(function AlarmConsole({
               <span className="count-n metric">{counts.shelved}</span> shelved
             </span>
           )}
+          {frozen && (
+            <span className="console-frozen" title="Order held while you work in the list">
+              order held
+            </span>
+          )}
         </div>
 
         <div className="console-filters">
-          <select
+          {/*
+            A datalist input rather than a <select>: it type-filters, so it still works at 60
+            skids where a dropdown of 60 options does not.
+          */}
+          <input
+            className="console-asset-filter metric"
+            list="bt-asset-options"
+            placeholder="All assets"
             aria-label="Filter by asset"
             value={filters.assetId ?? ''}
-            onChange={(e) => onFilters({ assetId: e.target.value === '' ? null : e.target.value })}
-          >
-            <option value="">All assets</option>
+            onChange={(e) => {
+              const v = e.target.value.trim();
+              onFilters({ assetId: v === '' ? null : v });
+            }}
+          />
+          <datalist id="bt-asset-options">
             {TOPOLOGY.assets.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.label}
               </option>
             ))}
-          </select>
+          </datalist>
 
           <select
             aria-label="Filter by severity"
@@ -105,12 +220,23 @@ export const AlarmConsole = memo(function AlarmConsole({
       </header>
 
       {!collapsed && (
-        <div className="console-body">
-          {groups.length === 0 ? (
-            <p className="console-empty">No alarms match the current filters.</p>
+        <div
+          className="console-body"
+          ref={listRef}
+          onPointerEnter={freeze}
+          onPointerLeave={thaw}
+          onFocusCapture={freeze}
+          onBlurCapture={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) thaw();
+          }}
+        >
+          {ordered.length === 0 ? (
+            <p className="console-empty">
+              {groups.length === 0 ? 'No active alarms.' : 'No alarms match the current filters.'}
+            </p>
           ) : (
             <ul className="console-list">
-              {groups.map((g) => (
+              {ordered.map((g) => (
                 <AlarmRow
                   key={g.id}
                   group={g}

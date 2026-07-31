@@ -81,3 +81,31 @@ export function extents(t: Topology, pad = 36) {
     h: Math.max(...ys) + NODE_H + pad - y,
   };
 }
+
+/**
+ * Diagram -> client-pixel transform, for anchoring screen-space overlays to nodes.
+ *
+ * The SVG auto-fits via preserveAspectRatio="xMidYMid meet", which letterboxes when the
+ * element's aspect ratio differs from the view box's. Ignoring that offset puts tooltips in
+ * the wrong place near the edges.
+ */
+export function diagramToClient(
+  box: { x: number; y: number; w: number; h: number },
+  cw: number,
+  ch: number,
+  x: number,
+  y: number,
+) {
+  const scale = Math.min(cw / box.w, ch / box.h);
+  return {
+    x: (cw - box.w * scale) / 2 + (x - box.x) * scale,
+    y: (ch - box.h * scale) / 2 + (y - box.y) * scale,
+    scale,
+  };
+}
+
+/**
+ * Smallest scale at which a node's label is still readable. Below this the diagram stops
+ * shrinking and the container scrolls instead — native scrollbars, not a custom pan gesture.
+ */
+export const MIN_READABLE_SCALE = 0.75;

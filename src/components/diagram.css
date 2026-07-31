@@ -6,55 +6,30 @@
   position: relative;
   width: 100%;
   height: 100%;
+  /* Past the smallest readable node size the diagram stops shrinking and this scrolls.
+     Native scrollbars, not a custom pan gesture: familiar, keyboard-reachable, and the
+     operator can always see how much of the site is off-screen. */
+  overflow: auto;
 }
 
 .diagram {
+  display: block;
   width: 100%;
   height: 100%;
-  display: block;
-  cursor: grab;
-  /* Wheel zoom owns the gesture; without this, trackpads pinch-zoom the whole page. */
-  touch-action: none;
 }
 
-.diagram[data-panning] {
-  cursor: grabbing;
+/* Scrollbars in the calm tier — they are chrome, not signal. */
+.diagram-wrap::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
 }
-
-/* Semantic zoom: below 0.8x, drop the metric line and keep mark + name + state.
-   Detail follows viewing distance — a wall of unreadable numbers is worse than none. */
-.diagram[data-detail='low'] .node-metric,
-.diagram[data-detail='low'] .node-plus {
-  display: none;
+.diagram-wrap::-webkit-scrollbar-thumb {
+  background: var(--bt-rule-strong);
+  border-radius: 5px;
+  border: 2px solid var(--bt-bg);
 }
-
-/* ---- zoom controls ---- */
-
-.zoom-controls {
-  position: absolute;
-  top: var(--bt-2);
-  right: var(--bt-2);
-  display: flex;
-  flex-direction: column;
-  gap: var(--bt-1);
-}
-
-.zoom-controls button {
-  width: 26px;
-  height: 26px;
-  font: inherit;
-  font-size: 13px;
-  line-height: 1;
-  color: var(--bt-text-muted);
-  background: var(--bt-surface);
-  border: 1px solid var(--bt-rule-strong);
-  border-radius: 2px;
-  cursor: pointer;
-}
-
-.zoom-controls button:hover {
-  color: var(--bt-text);
-  border-color: var(--bt-accent);
+.diagram-wrap::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* ---- connections ---- */

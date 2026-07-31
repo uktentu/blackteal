@@ -5,20 +5,75 @@
 
 .console {
   flex: none;
-  height: 26vh;
-  min-height: 180px;
   display: flex;
   flex-direction: column;
   border-top: 1px solid var(--bt-rule);
   background: var(--bt-surface);
-  resize: vertical;
   overflow: hidden;
+  /* Height is operator-controlled and persisted; see store/persist.ts. */
 }
 
 .console[data-collapsed] {
-  height: auto;
-  min-height: 0;
-  resize: none;
+  height: auto !important;
+}
+
+/* ---- resize handle ---- */
+
+.console-handle {
+  flex: none;
+  height: 7px;
+  margin-top: -4px;
+  cursor: ns-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* touch-action so a drag on the handle never scrolls the page underneath it. */
+  touch-action: none;
+}
+
+.console-grip {
+  width: 46px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--bt-rule-strong);
+  transition: background-color var(--bt-t-state) var(--bt-ease);
+}
+
+.console-handle:hover .console-grip,
+.console-handle:focus-visible .console-grip {
+  background: var(--bt-accent);
+}
+
+.console-handle:focus-visible {
+  outline: 2px solid var(--bt-accent);
+  outline-offset: -2px;
+}
+
+/* Order-held badge: informational, so it stays in the quiet tier. */
+.console-frozen {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bt-text-faint);
+  border: 1px solid var(--bt-rule);
+  border-radius: 2px;
+  padding: 1px 5px;
+}
+
+.console-asset-filter {
+  font-size: 11px;
+  width: 120px;
+  padding: 4px var(--bt-2);
+  min-height: 28px;
+  color: var(--bt-text);
+  background: var(--bt-bg);
+  border: 1px solid var(--bt-rule-strong);
+  border-radius: 2px;
+}
+
+.console-asset-filter::placeholder {
+  color: var(--bt-text-faint);
+  font-family: var(--bt-sans);
 }
 
 /* ---- header ---- */

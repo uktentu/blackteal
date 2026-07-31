@@ -4,9 +4,8 @@
  *
  * Laid out from the topology data (checklist A1). The data pack's coordinates are honored
  * exactly; a topology without coordinates (a real 60-skid site) goes through `ensureLayout`.
- * The view is zoomable/pannable, and detail follows viewing distance: zoomed below 0.8x the
- * nodes drop their metric line and keep mark + name + state, because text soup at zoom-out is
- * the classic SCADA failure.
+ * The view auto-fits its container. There is deliberately no zoom or pan — see the note on
+ * the Diagram component below.
  */
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -21,22 +20,19 @@ import type {
   TopologyAsset,
 } from '../domain/types';
 import { fmt, fmtMW, gridDirection, NO_DATA, powerDirection, STATE_LABEL } from './format';
-import { ensureLayout, extents, NODE_W, NODE_H } from './layout';
 import {
-  zoomAt,
-  pan,
-  centerOn,
-  contains,
-  clientToDiagram,
+  ensureLayout,
+  extents,
   diagramToClient,
-  zoomLevel,
-  type ViewBox,
-} from './viewbox';
+  NODE_W,
+  NODE_H,
+  MIN_READABLE_SCALE,
+} from './layout';
 import './diagram.css';
 
 /** The data pack is fully placed, so this is the identity — but the scale path is real. */
 const LAYOUT = ensureLayout(TOPOLOGY);
-const BASE: ViewBox = extents(LAYOUT);
+const BASE = extents(LAYOUT);
 
 /**
  * Diagram labels are shorter than the topology's full labels.
@@ -127,6 +123,7 @@ const AssetNode = memo(
     return (
       <g
         className="node"
+        data-asset-id={topo.id}
         data-state={state}
         data-selected={selected || undefined}
         data-flashed={flashed || undefined}
@@ -253,25 +250,27 @@ interface Props {
   onSelect: (id: string) => void;
 }
 
+/**
+ * The diagram auto-fits its container — there is no zoom or pan.
+ *
+ * That is a deliberate reversal. Zoom/pan is a map metaphor: it lets the operator navigate
+ * away from the thing that needs attention, so an alarming asset can sit off-screen while the
+ * alarm counts say everything is fine. On a surface whose entire job is situational awareness
+ * that is a safety problem, not a feature. It also broke click-to-open, because capturing the
+ * pointer on the SVG root retargets the click away from the node.
+ *
+ * The scale answer instead: the layout reflows into columns, the view auto-fits to whatever
+ * that produces, and past the smallest readable node size the container scrolls with ordinary
+ * native scrollbars — familiar, accessible, and impossible to get lost in.
+ */
 export function Diagram({ site, selectedId, flashedId, stale, onSelect }: Props) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
-  const svgRef = useRef<SVGSVGElement | null>(null);
-
-  const [vb, setVb] = useState<ViewBox>(BASE);
-  const vbRef = useRef(vb);
-  vbRef.current = vb;
-
   const [size, setSize] = useState({ cw: 0, ch: 0 });
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [panning, setPanning] = useState(false);
-
   const hoverTimer = useRef<number | null>(null);
-  const drag = useRef<{ mx: number; my: number; vb: ViewBox; moved: boolean } | null>(null);
-  const suppressClick = useRef(false);
 
   const byId = useMemo(() => Object.fromEntries(LAYOUT.assets.map((a) => [a.id, a])), []);
 
-  // Track the rendered size, so screen-space overlays can anchor to diagram coordinates.
   useEffect(() => {
     const el = wrapRef.current;
     if (el === null) return;
@@ -282,38 +281,6 @@ export function Diagram({ site, selectedId, flashedId, stale, onSelect }: Props)
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-
-  /**
-   * Wheel zoom, attached natively: React registers root wheel listeners as passive, so a JSX
-   * onWheel cannot preventDefault and the page would scroll while the operator zooms.
-   */
-  useEffect(() => {
-    const el = svgRef.current;
-    if (el === null) return;
-
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      const r = el.getBoundingClientRect();
-      const cur = vbRef.current;
-      const p = clientToDiagram(cur, r.width, r.height, e.clientX - r.left, e.clientY - r.top);
-      setVb(zoomAt(cur, BASE, e.deltaY < 0 ? 1.15 : 1 / 1.15, p.x, p.y));
-    };
-
-    el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
-  }, []);
-
-  // An alarm-row jump must land in view: flash is useless on a node outside the frame.
-  useEffect(() => {
-    if (flashedId === null) return;
-    const t = byId[flashedId];
-    if (t === undefined) return;
-    const cx = t.x + NODE_W / 2;
-    const cy = t.y + NODE_H / 2;
-    if (!contains(vbRef.current, cx, cy, 24)) {
-      setVb((cur) => centerOn(cur, BASE, cx, cy));
-    }
-  }, [flashedId, byId]);
 
   useEffect(
     () => () => {
@@ -335,70 +302,27 @@ export function Diagram({ site, selectedId, flashedId, stale, onSelect }: Props)
     hoverTimer.current = window.setTimeout(() => setHoveredId(id), 100);
   }, []);
 
-  const handleSelect = useCallback(
-    (id: string) => {
-      // A drag that ended on a node is a pan, not a click.
-      if (suppressClick.current) {
-        suppressClick.current = false;
-        return;
-      }
-      onSelect(id);
-    },
-    [onSelect],
-  );
+  // Keep a flashed asset visible: with native scrolling this is scrollIntoView, not a pan.
+  useEffect(() => {
+    if (flashedId === null || wrapRef.current === null) return;
+    wrapRef.current
+      .querySelector(`[data-asset-id="${CSS.escape(flashedId)}"]`)
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+  }, [flashedId]);
 
-  const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (e.button !== 0) return;
-    drag.current = { mx: e.clientX, my: e.clientY, vb, moved: false };
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
-
-  const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
-    const d = drag.current;
-    if (d === null) return;
-    const dx = e.clientX - d.mx;
-    const dy = e.clientY - d.my;
-    if (!d.moved && Math.hypot(dx, dy) < 4) return;
-    if (!d.moved) {
-      d.moved = true;
-      setPanning(true);
-      setHoveredId(null);
-    }
-    const r = svgRef.current!.getBoundingClientRect();
-    const scale = Math.min(r.width / d.vb.w, r.height / d.vb.h);
-    setVb(pan(d.vb, BASE, -dx / scale, -dy / scale));
-  };
-
-  const onPointerUp = () => {
-    if (drag.current?.moved) suppressClick.current = true;
-    drag.current = null;
-    setPanning(false);
-  };
-
-  const onDoubleClick = (e: React.MouseEvent) => {
-    // Reset only from the background; a double-click on a node is two selects, not a reset.
-    if ((e.target as Element).closest('.node') === null) setVb(BASE);
-  };
-
-  const zoom = zoomLevel(vb, BASE);
   const hoveredTopo = hoveredId !== null && hoveredId !== selectedId ? byId[hoveredId] : undefined;
 
   return (
     <div className="diagram-wrap" ref={wrapRef}>
       <svg
-        ref={svgRef}
         className="diagram"
-        data-detail={zoom < 0.8 ? 'low' : 'high'}
-        data-panning={panning || undefined}
-        viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
+        viewBox={`${BASE.x} ${BASE.y} ${BASE.w} ${BASE.h}`}
         preserveAspectRatio="xMidYMid meet"
+        /* Floor the rendered size so nodes never shrink below readable; the wrapper
+           scrolls past that point instead of continuing to shrink. */
+        style={{ minWidth: BASE.w * MIN_READABLE_SCALE, minHeight: BASE.h * MIN_READABLE_SCALE }}
         role="group"
         aria-label="Site single-line diagram"
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        onDoubleClick={onDoubleClick}
       >
         <g className="links">
           {LAYOUT.links.map((l) => {
@@ -431,45 +355,24 @@ export function Diagram({ site, selectedId, flashedId, stale, onSelect }: Props)
               selected={selectedId === topo.id}
               flashed={flashedId === topo.id}
               stale={stale}
-              onSelect={handleSelect}
+              onSelect={onSelect}
               onHover={onHover}
             />
           ))}
         </g>
       </svg>
 
-      {/* Zoom controls — quiet, hairline, keyboard-reachable. */}
-      <div className="zoom-controls" role="group" aria-label="Diagram zoom">
-        <button
-          type="button"
-          aria-label="Zoom in"
-          onClick={() => setVb((v) => zoomAt(v, BASE, 1.25, v.x + v.w / 2, v.y + v.h / 2))}
-        >
-          +
-        </button>
-        <button
-          type="button"
-          aria-label="Zoom out"
-          onClick={() => setVb((v) => zoomAt(v, BASE, 1 / 1.25, v.x + v.w / 2, v.y + v.h / 2))}
-        >
-          −
-        </button>
-        <button type="button" aria-label="Reset view" onClick={() => setVb(BASE)}>
-          ⤢
-        </button>
-      </div>
-
       {/*
-        Hover tooltip in SCREEN space, not SVG space. Inside the SVG it would scale with the
-        zoom — unreadable zoomed out, enormous zoomed in. Anchored to the node through the
-        current view transform instead.
+        Hover tooltip in SCREEN space. The SVG scales to fit, so an SVG-child tooltip would
+        scale with it and change size between a 6-asset and a 60-asset site. Anchored through
+        the fit transform instead, it is the same readable size always.
       */}
       {hoveredTopo !== undefined &&
         size.cw > 0 &&
         (() => {
           const lines = tooltipLines(hoveredTopo, site.assets[hoveredTopo.id]);
           const p = diagramToClient(
-            vb,
+            BASE,
             size.cw,
             size.ch,
             hoveredTopo.x + NODE_W / 2,
@@ -477,13 +380,12 @@ export function Diagram({ site, selectedId, flashedId, stale, onSelect }: Props)
           );
           const estH = 30 + lines.length * 17;
           const below = p.y + 10 + estH < size.ch;
-          const left = Math.min(Math.max(p.x, 100), size.cw - 100);
 
           return (
             <div
               className="tip-overlay"
               style={{
-                left,
+                left: Math.min(Math.max(p.x, 100), size.cw - 100),
                 top: below ? p.y + 8 : p.y - NODE_H * p.scale - 8,
                 transform: below ? 'translateX(-50%)' : 'translate(-50%, -100%)',
               }}

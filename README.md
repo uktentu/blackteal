@@ -34,8 +34,9 @@ Everything below happens **unattended within the first minute**, so there's noth
 | ~t+22 s | **Alarm burst** — 15+ alarms across four skids roll into a handful of grouped rows |
 | ~t+42 s | Skid 5 reconnects, OFFLINE → NORMAL |
 
-Both demo triggers are also buttons in the top strip: **Simulate alarm burst** and **Simulate
-dropout**. These drive the *simulator harness*, not plant equipment — the app itself is strictly
+Drag the top edge of the alarm console to resize it (arrow keys work too, when focused), and
+your layout is remembered. Both demo triggers are buttons in the top strip: **Simulate alarm
+burst** and **Simulate dropout**. These drive the *simulator harness*, not plant equipment — the app itself is strictly
 read-only monitoring, with no control actions anywhere. Click a skid to open its drawer; `Esc` closes it and `↑`/`↓` cycle assets.
 
 Worth opening deliberately: **Skid 3** (the brief omits three of its PCS fields — they render
@@ -117,10 +118,13 @@ time-boxed (group only alarms arriving within N seconds), which I'd add next.
 attention, but shelving is an explicit operator decision. Real shelving is also time-boxed —
 "silence for 4 hours" — which I'd add with a countdown in the row.
 
-**Semantic zoom stops at two levels.** The diagram zooms (wheel at cursor), pans (drag), and
-drops node detail below 0.8× — but a real 200-asset site would want a third level that clusters
-skids into blocks with rolled-up status. The mechanism (detail driven by zoom level) is in
-place; the clustering layer is the next step.
+**No zoom or pan on the diagram — deliberately.** I built it, then removed it. Zoom/pan is a
+map metaphor: it lets an operator navigate *away* from the asset that needs attention, so an
+alarming skid can sit off-screen while the counts say the site is fine. On a surface whose only
+job is situational awareness that is a safety property, not a missing feature. The diagram
+auto-fits instead, and past the smallest readable node size the container scrolls with ordinary
+native scrollbars — familiar, keyboard-reachable, and impossible to get lost in. (It also broke
+click-to-open: capturing the pointer on the SVG root retargets the click away from the node.)
 
 **History is in-memory only**, 60 samples per asset for the sparklines. Nothing persists across
 a reload. A real deployment reads a historian.
@@ -143,13 +147,20 @@ and tested rather than assumed:
 - **Layout** — the data pack's hand-placed coordinates are honored; a topology *without*
   coordinates goes through `ensureLayout`, which wraps skids into columns. Unit-tested against
   a synthetic 60-skid site: every node placed, no overlaps, fitted view contains everything.
-- **Navigation** — wheel zoom at the cursor, drag pan, double-click reset, and clicking an
-  alarm row pans its asset into view before flashing it. The view-box math is a pure module
-  with its own tests (zoom anchoring, clamping, letterbox round-trip).
-- **Detail follows viewing distance** — below 0.8× zoom, nodes drop the metric line and keep
-  mark + name + state. Text soup at zoom-out is the classic SCADA failure.
-- **Hover stays readable at any zoom** — the tooltip is a screen-space HTML overlay anchored
-  through the view transform, not an SVG child that would scale with it.
+- **Navigation** — the diagram auto-fits; past the smallest readable node size the container
+  scrolls natively. Clicking an alarm row scrolls its asset into view and flashes it. There is
+  no custom pan/zoom gesture to learn, and nothing to get lost in.
+- **Hover stays the same size at any site scale** — the tooltip is a screen-space HTML overlay
+  anchored through the fit transform, not an SVG child that would shrink with the diagram.
+- **Alarm rows never reorder under the pointer.** The feed re-sorts every second; the rendered
+  order freezes while the pointer or keyboard focus is inside the list, and releases when it
+  leaves. Without this a row can slide out from under you between reading it and clicking Ack,
+  and you acknowledge a different alarm than the one you read. New arrivals are appended rather
+  than hidden, so the freeze can never conceal an alarm.
+- **Operator layout persists** — console height, collapsed state and filters survive a reload,
+  because a screen someone watches for a shift shouldn't reset itself. Acknowledgements and
+  shelving deliberately do *not* persist: restoring a shelve from a previous session could hide
+  a live alarm from whoever comes on next.
 - **Per-tick cost is O(assets)** with memoized nodes, so one changed skid re-renders one node.
   The known cliffs at ~10× scale are listed above (console virtualization, node clustering,
   a historian for trends).

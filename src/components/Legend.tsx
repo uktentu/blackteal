@@ -36,9 +36,9 @@ export const Legend = memo(function Legend({ flowing }: { flowing: boolean }) {
 
       <span className="legend-sep" aria-hidden="true" />
 
-      {/* Discoverability for the view controls, in the quiet tier. */}
+      {/* Discoverability for the interactions, in the quiet tier. */}
       <span className="legend-item legend-hint">
-        Scroll to zoom · drag to pan · double-click to reset
+        Click an asset to inspect · Esc closes · ↑↓ cycles
       </span>
     </div>
   );
