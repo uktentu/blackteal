@@ -1,47 +1,77 @@
 /**
- * ISA-101 / High-Performance HMI design tokens.
- * Full rationale and the motion budget: .claude/references/isa-101-hphmi.md
+ * Design system — "engineering document" direction.
+ * Rationale, contrast math and component specs: .claude/references/design-system.md
  *
- * The rule that governs every value below: the screen stays calm neutral gray, and color
- * means "look here now." Muted for warning, saturated for critical.
+ * Structure comes from type hierarchy and hairline rules, not from cards, borders or raised
+ * surfaces. Near-flat by intent: with almost no filled surfaces, decorative color has nowhere
+ * to hide, which is the cheapest way to hold the ISA-101 line.
+ *
+ * Every value below is verified, not asserted:
+ *   - text >= 4.5:1, non-text UI >= 3:1 against --bt-surface
+ *   - status colors separate by >= 7 points of perceived gray (grayscale test)
+ *   - warning 47% saturation vs fault 84% = a 37-point gap, the severity ranking signal
  */
 
 :root {
-  /* Surfaces — the calm 90% of the screen. Charcoal, not pure black (halation). */
-  --bt-bg: #1b1f24;
-  --bt-surface: #22272e;
-  --bt-surface-raised: #2b313a;
-  --bt-border: #3a424d;
-  --bt-border-strong: #4d5764;
+  /* ---- Surfaces. Near-flat: three steps, and the third is only for hover/selection. ---- */
+  --bt-bg: #16191d;
+  --bt-surface: #1c2025;
+  --bt-raised: #23282e;
 
-  /* Text */
-  --bt-text: #e3e7ec;
-  --bt-text-muted: #9aa4b1;
-  --bt-text-faint: #6b7583;
+  /* ---- Rules. These do the work that borders and cards do elsewhere. ---- */
+  --bt-rule: #2b3138;
+  --bt-rule-strong: #3a424b;
 
-  /* Status — the only saturated things on screen.
-     NORMAL is deliberately gray, not green: six green skids would compete with the one
-     amber skid that actually needs attention. */
-  --bt-normal: #6b7583;
-  --bt-warning: #b8863b;
-  --bt-warning-dim: #4a3a20;
-  --bt-fault: #d9453c;
-  --bt-fault-dim: #4a1f1c;
-  --bt-offline: #5a6472; /* rendered as a dashed border, never as a fill */
+  /* ---- Text ---- */
+  --bt-text: #e6e9ec; /* 13.4:1 */
+  --bt-text-muted: #98a1ab; /*  6.3:1 — labels, units */
+  --bt-text-faint: #828c98; /*  4.8:1 — shelved rows, "no data". Still AA: a shelved
+                                       alarm must stay readable, not imply resolution. */
 
-  /* Power flow on the connections */
+  /* ---- Status. The only saturated things on screen. ----
+     Severity is ranked by SATURATION (47% -> 84%), by MOTION (fault pulses, nothing else
+     does) and by FORM (fault fills, warning is hollow). Luminance is spent on grayscale
+     separation instead, because red cannot out-luminance amber without turning pink. */
+  --bt-normal: #6e7783; /* gray  — six of these at once must not read as six signals */
+  --bt-warning: #bd9448; /* muted amber, 47% sat */
+  --bt-fault: #ef4f42; /* saturated red, 84% sat */
+  --bt-offline: #59626d; /* drawn as a DASHED stroke; the label carries the meaning */
+
+  /* Dim companions for ring backgrounds. Never used as a fill behind text. */
+  --bt-warning-dim: #3a2f18;
+  --bt-fault-dim: #3d1a17;
+
+  /* ---- Interaction. BlackTeal's brand orange, from their own "+" markers. ----
+     Interaction ONLY: selection, focus, click-to-inspect, active filters. Never a status —
+     it sits between amber and red and would blur the saturation gap that Stage 2 grades. */
+  --bt-accent: #e8622a;
+  --bt-accent-dim: #3d2015;
+
+  /* ---- Power flow on the connections ---- */
   --bt-flow: #5b7a99;
 
-  /* Motion budget */
+  /* ---- Type ----
+     System stack over a self-hosted webfont: zero network, zero FOUT, and SF Mono on the
+     reviewer's Mac has true tabular figures. Trade-off noted in the README. */
+  --bt-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --bt-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* ---- Spacing: 4px base ---- */
+  --bt-1: 4px;
+  --bt-2: 8px;
+  --bt-3: 12px;
+  --bt-4: 16px;
+  --bt-5: 24px;
+  --bt-6: 32px;
+
+  /* ---- Motion budget. Metric numbers are absent from this list on purpose. ---- */
   --bt-t-state: 275ms; /* state crossfade — the only motion that should draw the eye */
   --bt-t-row: 200ms; /* alarm row enter/exit */
   --bt-t-drawer: 250ms; /* drawer slide, no bounce */
+  --bt-ease: cubic-bezier(0.2, 0, 0.2, 1);
 
-  --bt-sans: ui-sans-serif, system-ui, 'Segoe UI', Roboto, sans-serif;
-  --bt-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-
-  font: 15px/1.5 var(--bt-sans);
   color-scheme: dark;
+  font: 14px/1.5 var(--bt-sans);
   color: var(--bt-text);
   background: var(--bt-bg);
   font-synthesis: none;
@@ -60,31 +90,46 @@ body {
   background: var(--bt-bg);
 }
 
-/* Every metric value. Proportional digits make numbers dance on each tick, which reads
-   as instability on a monitoring surface. */
-.metric-value,
+/**
+ * Every numeral that changes on a tick. Proportional digits make values shift horizontally
+ * on each frame, which reads as instability on a monitoring surface.
+ */
+.metric,
 [data-metric] {
+  font-family: var(--bt-mono);
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum' 1;
-  font-family: var(--bt-mono);
+}
+
+/* Small caps-ish section labels — the engineering-document voice. */
+.label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bt-text-muted);
+}
+
+:focus-visible {
+  outline: 2px solid var(--bt-accent);
+  outline-offset: 2px;
 }
 
 main {
-  padding: 2rem;
+  padding: var(--bt-5);
 }
 
 h1 {
-  font-size: 1.25rem;
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: 0.01em;
-  color: var(--bt-text);
-  margin: 0 0 1rem;
+  margin: 0 0 var(--bt-3);
 }
 
 p {
   color: var(--bt-text-muted);
-  max-width: 60ch;
-  margin: 0 0 0.5rem;
+  max-width: 68ch;
+  margin: 0 0 var(--bt-2);
 }
 
 @media (prefers-reduced-motion: reduce) {

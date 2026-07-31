@@ -162,6 +162,8 @@ export const THRESHOLDS = {
   insulation_crit_MOhm: 0.5,
   insulation_low_MOhm: 1.0,
   soh_degraded_pct: 80,
+  /** The catalog says "current > rating" without giving one. Use the schema's ceiling. */
+  dc_overcurrent_A: 1900,
   grid_freq_min_Hz: 59.5,
   grid_freq_max_Hz: 60.5,
   igbt_temp_warn_C: 75,
