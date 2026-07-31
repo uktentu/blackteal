@@ -27,8 +27,9 @@ export interface PersistedLayout {
 }
 
 export const DEFAULT_LAYOUT: PersistedLayout = {
-  // The single-line diagram is the default: it is the denser, faster read for monitoring.
-  view: 'diagram',
+  // The site model is the default: it is the view that reads instantly on first open, and the
+  // schematic is one click away for anyone who wants the denser monitoring layout.
+  view: 'site',
   consoleHeight: 240,
   consoleCollapsed: false,
   filterAssetId: null,
@@ -66,7 +67,7 @@ export function loadLayout(): PersistedLayout {
     const p = parsed as Partial<PersistedLayout>;
 
     return {
-      view: p.view === 'site' ? 'site' : 'diagram',
+      view: p.view === 'diagram' ? 'diagram' : 'site',
       consoleHeight:
         typeof p.consoleHeight === 'number' && Number.isFinite(p.consoleHeight)
           ? clampConsoleHeight(p.consoleHeight)

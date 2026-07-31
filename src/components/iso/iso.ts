@@ -92,6 +92,16 @@ export function sortByDepth<T extends { box: Box }>(items: T[]): T[] {
   return [...items].sort((a, b) => depth(a.box) - depth(b.box));
 }
 
+/**
+ * A soft contact shadow on the ground beneath a box.
+ *
+ * Isometric scenes read flat without one — every building appears to float at the same depth.
+ * Offset along +X/+Z so the light direction agrees with the face shading.
+ */
+export function groundShadow(b: Box, spread = 2.5): string {
+  return quad(b.x + spread, 0.06, b.z + spread, b.w, b.d);
+}
+
 /** Screen-space centre of a box's top face — where labels and "+" markers anchor. */
 export function topCentre(b: Box): Pt {
   return project(b.x + b.w / 2, b.y + b.h, b.z + b.d / 2);

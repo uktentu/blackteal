@@ -11,7 +11,7 @@
 import type { Box } from './iso';
 
 /** Ground slab the whole site sits on. */
-export const GROUND: Box = { x: -104, y: -3.5, z: -30, w: 348, h: 3.5, d: 112 };
+export const GROUND: Box = { x: -108, y: -3.5, z: -18, w: 372, h: 3.5, d: 88 };
 
 /** Containerised skid: long along X, matching the figure's proportions. */
 const SKID_W = 40;
@@ -23,32 +23,32 @@ export const SKID_BOXES: Record<string, Box> = {
   'SKID-1': { x: 6, y: 0, z: 2, w: SKID_W, h: SKID_H, d: SKID_D },
   'SKID-2': { x: 58, y: 0, z: 2, w: SKID_W, h: SKID_H, d: SKID_D },
   'SKID-3': { x: 110, y: 0, z: 2, w: SKID_W, h: SKID_H, d: SKID_D },
-  'SKID-4': { x: 6, y: 0, z: 38, w: SKID_W, h: SKID_H, d: SKID_D },
-  'SKID-5': { x: 58, y: 0, z: 38, w: SKID_W, h: SKID_H, d: SKID_D },
-  'SKID-6': { x: 110, y: 0, z: 38, w: SKID_W, h: SKID_H, d: SKID_D },
+  'SKID-4': { x: 6, y: 0, z: 32, w: SKID_W, h: SKID_H, d: SKID_D },
+  'SKID-5': { x: 58, y: 0, z: 32, w: SKID_W, h: SKID_H, d: SKID_D },
+  'SKID-6': { x: 110, y: 0, z: 32, w: SKID_W, h: SKID_H, d: SKID_D },
 };
 
 /** Data-centre hall, plus the low annex and rooftop plant the figure shows. */
-export const LOAD_BOX: Box = { x: -94, y: 0, z: -6, w: 62, h: 34, d: 60 };
-export const LOAD_ANNEX: Box = { x: -40, y: 0, z: 10, w: 22, h: 16, d: 36 };
+export const LOAD_BOX: Box = { x: -98, y: 0, z: -4, w: 64, h: 36, d: 52 };
+export const LOAD_ANNEX: Box = { x: -42, y: 0, z: 8, w: 24, h: 17, d: 34 };
 export const LOAD_PLANT: Box[] = [
-  { x: -34, y: 16, z: 16, w: 8, h: 6, d: 8 },
-  { x: -34, y: 16, z: 32, w: 8, h: 6, d: 8 },
-  { x: -20, y: 0, z: 24, w: 7, h: 7, d: 9 },
+  { x: -36, y: 17, z: 13, w: 8, h: 6, d: 8 },
+  { x: -36, y: 17, z: 28, w: 8, h: 6, d: 8 },
+  { x: -22, y: 0, z: 20, w: 7, h: 7, d: 9 },
 ];
 
 /** Substation pad, main transformer tank and its cooling radiators. */
-export const SUB_PAD: Box = { x: 174, y: 0, z: 6, w: 54, h: 2, d: 46 };
-export const SUB_BOX: Box = { x: 186, y: 2, z: 16, w: 30, h: 20, d: 26 };
+export const SUB_PAD: Box = { x: 176, y: 0, z: 4, w: 56, h: 2, d: 44 };
+export const SUB_BOX: Box = { x: 188, y: 2, z: 13, w: 32, h: 21, d: 26 };
 export const SUB_RADS: Box[] = [
-  { x: 180, y: 2, z: 19, w: 5, h: 15, d: 20 },
-  { x: 217, y: 2, z: 19, w: 5, h: 15, d: 20 },
+  { x: 182, y: 2, z: 16, w: 5, h: 16, d: 20 },
+  { x: 221, y: 2, z: 16, w: 5, h: 16, d: 20 },
 ];
 /** Bushings on the transformer lid. */
 export const SUB_BUSHINGS: Box[] = [
-  { x: 191, y: 22, z: 24, w: 3, h: 9, d: 3 },
-  { x: 199, y: 22, z: 24, w: 3, h: 11, d: 3 },
-  { x: 207, y: 22, z: 24, w: 3, h: 9, d: 3 },
+  { x: 193, y: 23, z: 21, w: 3, h: 9, d: 3 },
+  { x: 202, y: 23, z: 21, w: 3, h: 12, d: 3 },
+  { x: 211, y: 23, z: 21, w: 3, h: 9, d: 3 },
 ];
 
 /**
@@ -57,14 +57,14 @@ export const SUB_BUSHINGS: Box[] = [
  */
 export const PYLON = {
   /** Base corners and apex, in world space. */
-  x: 268,
-  z: 24,
-  baseHalf: 17,
-  height: 86,
+  x: 276,
+  z: 20,
+  baseHalf: 16,
+  height: 74,
   /** Cross-arm heights and half-spans. */
   arms: [
-    { y: 54, half: 26 },
-    { y: 68, half: 21 },
+    { y: 46, half: 25 },
+    { y: 59, half: 20 },
   ],
 };
 

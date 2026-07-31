@@ -27,6 +27,13 @@ function renderApp() {
   return { user, ...view };
 }
 
+/** The app opens on the site model; these switch to the schematic first. */
+async function renderDiagram() {
+  const r = renderApp();
+  await r.user.click(screen.getByRole('tab', { name: 'Diagram' }));
+  return r;
+}
+
 beforeEach(() => {
   useSiteStore.setState({
     site: INITIAL_SNAPSHOT,
@@ -46,16 +53,16 @@ beforeEach(() => {
 });
 
 describe('core requirement: render the site from the topology', () => {
-  it('draws the substation, all six skids and the load', () => {
-    renderApp();
+  it('draws the substation, all six skids and the load', async () => {
+    await renderDiagram();
     for (const label of ['Substation', 'Skid 1', 'Skid 2', 'Skid 3', 'Skid 4', 'Skid 5', 'Skid 6']) {
       expect(screen.getByRole('button', { name: new RegExp(label, 'i') })).toBeInTheDocument();
     }
     expect(screen.getByRole('button', { name: /Data Center Load/i })).toBeInTheDocument();
   });
 
-  it('shows status as text, not colour alone', () => {
-    renderApp();
+  it('shows status as text, not colour alone', async () => {
+    await renderDiagram();
     // The accessible name carries the state, which is what a screen reader and the
     // grayscale test both depend on.
     expect(screen.getByRole('button', { name: /Power Skid 2, Warning/i })).toBeInTheDocument();
@@ -63,8 +70,8 @@ describe('core requirement: render the site from the topology', () => {
     expect(screen.getByRole('button', { name: /Power Skid 1, Normal/i })).toBeInTheDocument();
   });
 
-  it('shows a key metric on each asset', () => {
-    renderApp();
+  it('shows a key metric on each asset', async () => {
+    await renderDiagram();
     expect(screen.getByRole('button', { name: /Power Skid 1.*-1\.98 MW/i })).toBeInTheDocument();
   });
 });
@@ -78,13 +85,13 @@ describe('core requirement: click an asset opens its detail panel', () => {
     ['Grid / Substation', 'Grid / Substation (138 kV)'],
     ['Data Center Load', 'Data Center Load'],
   ])('clicking %s opens its drawer', async (nodeName, title) => {
-    const { user } = renderApp();
+    const { user } = await renderDiagram();
     await user.click(screen.getByRole('button', { name: new RegExp(nodeName, 'i') }));
     expect(await screen.findByRole('heading', { name: title, level: 2 })).toBeInTheDocument();
   });
 
   it('shows telemetry, active alarms and connection health together', async () => {
-    const { user } = renderApp();
+    const { user } = await renderDiagram();
     await user.click(screen.getByRole('button', { name: /Power Skid 2/i }));
 
     const drawer = (await screen.findByText('Connection health')).closest('.drawer') as HTMLElement;
@@ -95,7 +102,7 @@ describe('core requirement: click an asset opens its detail panel', () => {
   });
 
   it('closes on Escape and returns focus', async () => {
-    const { user } = renderApp();
+    const { user } = await renderDiagram();
     const node = screen.getByRole('button', { name: /Power Skid 1/i });
     await user.click(node);
     expect(await screen.findByRole('heading', { name: 'Power Skid 1', level: 2 })).toBeInTheDocument();
@@ -107,7 +114,7 @@ describe('core requirement: click an asset opens its detail panel', () => {
 
 describe('graded edge case: missing metrics never render as zero', () => {
   it('shows a dash for the three PCS fields SKID-3 omits', async () => {
-    const { user } = renderApp();
+    const { user } = await renderDiagram();
     await user.click(screen.getByRole('button', { name: /Power Skid 3/i }));
 
     const acVoltage = (await screen.findByText('AC voltage')).closest('.row')!;
@@ -125,7 +132,7 @@ describe('graded edge case: missing metrics never render as zero', () => {
   });
 
   it('opens the offline skid and explains the absence rather than showing zeros', async () => {
-    const { user } = renderApp();
+    const { user } = await renderDiagram();
     await user.click(screen.getByRole('button', { name: /Power Skid 5/i }));
 
     expect(await screen.findByText('No telemetry from this asset')).toBeInTheDocument();
@@ -246,24 +253,25 @@ describe('Stage 1: alarm console', () => {
 });
 
 describe('two views of one live state', () => {
-  it('starts on the single-line diagram', () => {
+  it('opens on the site model', () => {
     renderApp();
-    expect(screen.getByRole('group', { name: /single-line diagram/i })).toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: /isometric site view/i })).not.toBeInTheDocument();
-  });
-
-  it('switches to the isometric site view', async () => {
-    const { user } = renderApp();
-    await user.click(screen.getByRole('tab', { name: 'Site 3D' }));
-
     expect(screen.getByRole('group', { name: /isometric site view/i })).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: /single-line diagram/i })).not.toBeInTheDocument();
   });
 
-  it('keeps every asset inspectable in the 3D view, with the same accessible names', async () => {
+  it('switches to the single-line diagram and back', async () => {
     const { user } = renderApp();
-    await user.click(screen.getByRole('tab', { name: 'Site 3D' }));
 
+    await user.click(screen.getByRole('tab', { name: 'Diagram' }));
+    expect(screen.getByRole('group', { name: /single-line diagram/i })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: /isometric site view/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'Site 3D' }));
+    expect(screen.getByRole('group', { name: /isometric site view/i })).toBeInTheDocument();
+  });
+
+  it('keeps every asset inspectable in the 3D view, with the same accessible names', () => {
+    renderApp();
     for (const label of ['Power Skid 1', 'Power Skid 5', 'Grid / Substation', 'Data Center Load']) {
       expect(screen.getByRole('button', { name: new RegExp(label, 'i') })).toBeInTheDocument();
     }
@@ -271,17 +279,14 @@ describe('two views of one live state', () => {
 
   it('opens the same drawer from the 3D view', async () => {
     const { user } = renderApp();
-    await user.click(screen.getByRole('tab', { name: 'Site 3D' }));
     await user.click(screen.getByRole('button', { name: /Power Skid 2, Warning/i }));
 
     expect(await screen.findByRole('heading', { name: 'Power Skid 2', level: 2 })).toBeInTheDocument();
     expect(screen.getByText('Connection health')).toBeInTheDocument();
   });
 
-  it('carries live status onto the 3D scene', async () => {
-    const { user } = renderApp();
-    await user.click(screen.getByRole('tab', { name: 'Site 3D' }));
-
+  it('carries live status onto the 3D scene', () => {
+    renderApp();
     // Status must be readable from the model itself, not only from the alarm list.
     const skid2 = screen.getByRole('button', { name: /Power Skid 2, Warning/i });
     expect(skid2).toHaveAttribute('data-state', 'WARNING');
@@ -295,12 +300,12 @@ describe('two views of one live state', () => {
     // Asserts the contract an operator cares about — the screen comes back how they left it —
     // rather than poking at storage internals.
     const { user, unmount } = renderApp();
-    await user.click(screen.getByRole('tab', { name: 'Site 3D' }));
-    expect(screen.getByRole('group', { name: /isometric site view/i })).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Diagram' }));
+    expect(screen.getByRole('group', { name: /single-line diagram/i })).toBeInTheDocument();
 
     unmount();
     renderApp();
-    expect(screen.getByRole('group', { name: /isometric site view/i })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: /single-line diagram/i })).toBeInTheDocument();
   });
 });
 
@@ -370,7 +375,7 @@ describe('alarm console alignment', () => {
 
 describe('core requirement: stale feed is never presented as live', () => {
   it('flags a dropout site-wide and in the drawer', async () => {
-    const { user } = renderApp();
+    const { user } = await renderDiagram();
     act(() => useSiteStore.setState({ stale: true, site: { ...INITIAL_SNAPSHOT, stale: true } }));
 
     expect(await screen.findByText(/FEED DISCONNECTED/)).toBeInTheDocument();
@@ -427,7 +432,7 @@ describe('accessibility', () => {
   });
 
   it('moves focus into the drawer when it opens', async () => {
-    const { user } = renderApp();
+    const { user } = await renderDiagram();
     await user.click(screen.getByRole('button', { name: /Power Skid 1/i }));
     expect(await screen.findByRole('button', { name: /Close \(Esc\)/i })).toHaveFocus();
   });
