@@ -39,10 +39,35 @@ export interface SimControl {
   dropout: boolean;
   /** True while the burst is active, so it can be held for a few seconds then released. */
   burstUntil_s: number | null;
+  /** Set by a manual reconnect trigger, consumed on the next frame. */
+  pendingReconnect: boolean;
 }
 
 export function initialControl(): SimControl {
-  return { t: 0, fired: new Set(), queued: [], dropout: false, burstUntil_s: null };
+  return {
+    t: 0,
+    fired: new Set(),
+    queued: [],
+    dropout: false,
+    burstUntil_s: null,
+    pendingReconnect: false,
+  };
+}
+
+/**
+ * Drain the manual trigger queue.
+ *
+ * Split out of `applyScenarios` and run BEFORE the frame is computed, because the dropout
+ * toggle has to be honoured even on a tick where no frame is produced — otherwise the feed
+ * could be stopped but never restarted.
+ */
+export function drainTriggers(ctl: SimControl): void {
+  for (const trigger of ctl.queued) {
+    if (trigger === 'burst') ctl.burstUntil_s = ctl.t + 10;
+    if (trigger === 'dropout') ctl.dropout = !ctl.dropout;
+    if (trigger === 'reconnect') ctl.pendingReconnect = true;
+  }
+  ctl.queued = [];
 }
 
 const skid = (s: SiteState, id: string) => s.assets[id] as SkidAsset;
@@ -253,13 +278,10 @@ function clearBurst(state: SiteState): SiteState {
 export function applyScenarios(state: SiteState, ctl: SimControl): SiteState {
   let next = state;
 
-  // --- manual triggers, drained each tick ---
-  for (const trigger of ctl.queued) {
-    if (trigger === 'burst') ctl.burstUntil_s = ctl.t + 10;
-    if (trigger === 'dropout') ctl.dropout = !ctl.dropout;
-    if (trigger === 'reconnect') next = reconnectSkid5(next);
+  if (ctl.pendingReconnect) {
+    ctl.pendingReconnect = false;
+    next = reconnectSkid5(next);
   }
-  ctl.queued = [];
 
   // --- scripted timeline ---
   if (ctl.t >= TIMELINE.skid2CoolStart_s) next = coolSkid2(next);

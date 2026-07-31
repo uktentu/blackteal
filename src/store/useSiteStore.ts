@@ -12,9 +12,6 @@ import { simulateFrame, siteSummary, TICK_MS } from '../sim/simulate';
 import { initialControl, type SimControl, type TriggerKind } from '../sim/scenarios';
 import { groupAlarms, type AlarmGroup } from '../sim/alarmFeed';
 
-/** How long without a frame before the UI declares the feed stale. */
-export const STALE_AFTER_MS = 3000;
-
 /** Ring buffer length for detail-panel sparklines (Stage 3). */
 const HISTORY = 60;
 

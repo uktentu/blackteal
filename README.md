@@ -2,6 +2,8 @@
 
 > **Live demo:** _add the deploy URL here before sending_
 
+![Page load, Skid 2 recovering, the alarm burst grouping, and a feed dropout](docs/demo.gif)
+
 An operator-facing monitoring view for a grid-connected BESS supporting a ~38 MW data-center
 load: a live single-line diagram, per-asset drill-down, and an alarm console built to
 High-Performance HMI (ISA-101) conventions.
@@ -14,7 +16,7 @@ npm run dev          # http://localhost:5173
 ```
 
 ```bash
-npm test             # 73 tests over the simulator, rule engine and alarm feed
+npm test             # 78 tests over the simulator, rule engine and alarm feed
 npm run build        # typecheck + production build to dist/
 npm run check        # typecheck + lint + tests
 ```
@@ -33,7 +35,8 @@ Everything below happens **unattended within the first minute**, so there's noth
 | ~t+42 s | Skid 5 reconnects, OFFLINE → NORMAL |
 
 Both demo triggers are also buttons in the top strip: **Simulate alarm burst** and **Simulate
-dropout**. Click a skid to open its drawer; `Esc` closes it and `↑`/`↓` cycle assets.
+dropout**. These drive the *simulator harness*, not plant equipment — the app itself is strictly
+read-only monitoring, with no control actions anywhere. Click a skid to open its drawer; `Esc` closes it and `↑`/`↓` cycle assets.
 
 Worth opening deliberately: **Skid 3** (the brief omits three of its PCS fields — they render
 as `—`, never as `0`) and **Skid 5** (fully offline; the panel still opens and explains why
@@ -58,6 +61,16 @@ scenarios → enforce envelope → re-solve power balance → re-derive alarms`.
 *solved* from `load − Σ(skid discharge)`, never jittered on its own, and jitter carries a
 restoring pull toward each anchor so a long session can't drift a metric out of band and fire
 phantom alarms.
+
+**A dropout really stops the feed.** When the feed drops, `simulateFrame` returns the previous
+frame untouched — no jitter step, nothing. A banner reading "not live" above numbers that keep
+ticking is worse than no banner at all, and it's the first thing anyone testing that button
+notices.
+
+**Alarms have hysteresis.** Thresholds fire on the raw limit but only clear once the value has
+travelled back past it by a deadband (ISA-18.2 practice). Without this the snapshot's Skid 2 —
+whose 8.1 °C spread sits 0.1 above its 8.0 limit — chatters on and off several times a second
+from jitter alone, which is exactly the noise Stage 1 exists to eliminate.
 
 **Scenarios move telemetry; they never inject alarms.** To create an alarm the simulator drives
 the underlying metric across its threshold and lets the rules fire. A hand-injected alarm would
@@ -112,7 +125,7 @@ the diagram below 1100px) and the SVG scales, but there's no pan/zoom for a 60-s
 a reload. A real deployment reads a historian.
 
 **No E2E test suite.** The graded logic — simulator, rules, alarm feed — is pure and covered by
-73 unit tests. UI behaviour I verified by driving a headless browser and inspecting screenshots
+78 unit tests. UI behaviour I verified by driving a headless browser and inspecting screenshots
 rather than by writing Playwright specs, which would have been the better long-term investment
 if this were going to keep growing.
 

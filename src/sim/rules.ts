@@ -8,7 +8,7 @@
  * Pure. No React, no clock, no randomness.
  */
 
-import { ALARM_CATALOG, THRESHOLDS, SEVERITY_ORDER } from '../domain/alarmCatalog';
+import { ALARM_CATALOG, THRESHOLDS, SEVERITY_ORDER, DEADBAND } from '../domain/alarmCatalog';
 import type { AlarmRule, RuleGroup } from '../domain/alarmCatalog';
 import type {
   Alarm,
@@ -34,22 +34,43 @@ const f2 = (n: number) => n.toFixed(2);
 const f3 = (n: number) => n.toFixed(3);
 
 /**
+ * Codes currently active on this asset. Passing them in enables hysteresis: a live alarm
+ * holds until the value travels back past its threshold by the deadband.
+ */
+export type ActiveCodes = ReadonlySet<AlarmCode> | undefined;
+
+/**
+ * "Value is above the limit" with hysteresis.
+ *
+ * Firing uses the raw limit; CLEARING requires the value to fall a deadband below it. Without
+ * this an alarm sitting a hair over its threshold toggles on every jitter step.
+ */
+function over(v: number, limit: number, band: number, code: AlarmCode, active: ActiveCodes) {
+  return active?.has(code) ? v > limit - band : v > limit;
+}
+
+/** "Value is below the limit" with hysteresis, mirrored. */
+function under(v: number, limit: number, band: number, code: AlarmCode, active: ActiveCodes) {
+  return active?.has(code) ? v < limit + band : v < limit;
+}
+
+/**
  * Battery rules. Each returns a candidate when tripped.
  *
  * Note every guard is `!= null` rather than truthy — a legitimate 0 (SoC 0%, 0 strings online)
  * must still be evaluated, and `undefined` must never be compared numerically.
  */
-function batteryCandidates(b: BatteryTelemetry): Candidate[] {
+function batteryCandidates(b: BatteryTelemetry, active: ActiveCodes): Candidate[] {
   const out: Candidate[] = [];
 
   if (b.cell_v_max != null) {
-    if (b.cell_v_max > THRESHOLDS.cell_v_max_crit) {
+    if (over(b.cell_v_max, THRESHOLDS.cell_v_max_crit, DEADBAND.cell_v, 'CELL_OV', active)) {
       out.push({
         code: 'CELL_OV',
         value: b.cell_v_max,
         format: (v) => `Cell overvoltage - max cell at ${f3(v)} V`,
       });
-    } else if (b.cell_v_max > THRESHOLDS.cell_v_max_warn) {
+    } else if (over(b.cell_v_max, THRESHOLDS.cell_v_max_warn, DEADBAND.cell_v, 'CELL_OV_WARN', active)) {
       out.push({
         code: 'CELL_OV_WARN',
         value: b.cell_v_max,
@@ -59,13 +80,13 @@ function batteryCandidates(b: BatteryTelemetry): Candidate[] {
   }
 
   if (b.cell_v_min != null) {
-    if (b.cell_v_min < THRESHOLDS.cell_v_min_crit) {
+    if (under(b.cell_v_min, THRESHOLDS.cell_v_min_crit, DEADBAND.cell_v, 'CELL_UV', active)) {
       out.push({
         code: 'CELL_UV',
         value: b.cell_v_min,
         format: (v) => `Cell undervoltage - min cell at ${f3(v)} V`,
       });
-    } else if (b.cell_v_min < THRESHOLDS.cell_v_min_warn) {
+    } else if (under(b.cell_v_min, THRESHOLDS.cell_v_min_warn, DEADBAND.cell_v, 'CELL_UV_WARN', active)) {
       out.push({
         code: 'CELL_UV_WARN',
         value: b.cell_v_min,
@@ -75,13 +96,13 @@ function batteryCandidates(b: BatteryTelemetry): Candidate[] {
   }
 
   if (b.cell_temp_max_C != null) {
-    if (b.cell_temp_max_C > THRESHOLDS.cell_temp_crit_C) {
+    if (over(b.cell_temp_max_C, THRESHOLDS.cell_temp_crit_C, DEADBAND.cell_temp_C, 'TEMP_CRIT', active)) {
       out.push({
         code: 'TEMP_CRIT',
         value: b.cell_temp_max_C,
         format: (v) => `Battery over-temperature (max ${f1(v)} C) - derate or stop`,
       });
-    } else if (b.cell_temp_max_C > THRESHOLDS.cell_temp_warn_C) {
+    } else if (over(b.cell_temp_max_C, THRESHOLDS.cell_temp_warn_C, DEADBAND.cell_temp_C, 'TEMP_HIGH', active)) {
       out.push({
         code: 'TEMP_HIGH',
         value: b.cell_temp_max_C,
@@ -90,7 +111,10 @@ function batteryCandidates(b: BatteryTelemetry): Candidate[] {
     }
   }
 
-  if (b.cell_temp_delta_C != null && b.cell_temp_delta_C > THRESHOLDS.cell_temp_delta_warn_C) {
+  if (
+    b.cell_temp_delta_C != null &&
+    over(b.cell_temp_delta_C, THRESHOLDS.cell_temp_delta_warn_C, DEADBAND.cell_temp_delta_C, 'TEMP_DELTA', active)
+  ) {
     out.push({
       code: 'TEMP_DELTA',
       value: b.cell_temp_delta_C,
@@ -98,7 +122,7 @@ function batteryCandidates(b: BatteryTelemetry): Candidate[] {
     });
   }
 
-  if (b.soc_pct != null && b.soc_pct < THRESHOLDS.soc_low_pct) {
+  if (b.soc_pct != null && under(b.soc_pct, THRESHOLDS.soc_low_pct, DEADBAND.soc_pct, 'SOC_LOW', active)) {
     out.push({
       code: 'SOC_LOW',
       value: b.soc_pct,
@@ -107,13 +131,13 @@ function batteryCandidates(b: BatteryTelemetry): Candidate[] {
   }
 
   if (b.insulation_MOhm != null) {
-    if (b.insulation_MOhm < THRESHOLDS.insulation_crit_MOhm) {
+    if (under(b.insulation_MOhm, THRESHOLDS.insulation_crit_MOhm, DEADBAND.insulation_MOhm, 'INSULATION_CRIT', active)) {
       out.push({
         code: 'INSULATION_CRIT',
         value: b.insulation_MOhm,
         format: (v) => `Insulation critical at ${f2(v)} MOhm - ground-fault risk`,
       });
-    } else if (b.insulation_MOhm < THRESHOLDS.insulation_low_MOhm) {
+    } else if (under(b.insulation_MOhm, THRESHOLDS.insulation_low_MOhm, DEADBAND.insulation_MOhm, 'INSULATION_LOW', active)) {
       out.push({
         code: 'INSULATION_LOW',
         value: b.insulation_MOhm,
@@ -122,7 +146,7 @@ function batteryCandidates(b: BatteryTelemetry): Candidate[] {
     }
   }
 
-  if (b.current_A != null && b.current_A > THRESHOLDS.dc_overcurrent_A) {
+  if (b.current_A != null && over(b.current_A, THRESHOLDS.dc_overcurrent_A, DEADBAND.current_A, 'DC_OVERCURRENT', active)) {
     out.push({
       code: 'DC_OVERCURRENT',
       value: b.current_A,
@@ -130,7 +154,7 @@ function batteryCandidates(b: BatteryTelemetry): Candidate[] {
     });
   }
 
-  if (b.soh_pct != null && b.soh_pct < THRESHOLDS.soh_degraded_pct) {
+  if (b.soh_pct != null && under(b.soh_pct, THRESHOLDS.soh_degraded_pct, DEADBAND.soh_pct, 'SOH_DEGRADED', active)) {
     out.push({
       code: 'SOH_DEGRADED',
       value: b.soh_pct,
@@ -150,12 +174,12 @@ function batteryCandidates(b: BatteryTelemetry): Candidate[] {
   return out;
 }
 
-function pcsCandidates(p: PcsTelemetry): Candidate[] {
+function pcsCandidates(p: PcsTelemetry, active: ActiveCodes): Candidate[] {
   const out: Candidate[] = [];
 
   // The catalog has no IGBT code, but the schema documents "warn > 75". Surface it as a
   // thermal-management warning rather than inventing a code outside the catalog.
-  if (p.igbt_temp_C != null && p.igbt_temp_C > THRESHOLDS.igbt_temp_warn_C) {
+  if (p.igbt_temp_C != null && over(p.igbt_temp_C, THRESHOLDS.igbt_temp_warn_C, DEADBAND.igbt_temp_C, 'HVAC_FAULT', active)) {
     out.push({
       code: 'HVAC_FAULT',
       value: p.igbt_temp_C,
@@ -166,12 +190,13 @@ function pcsCandidates(p: PcsTelemetry): Candidate[] {
   return out;
 }
 
-function substationCandidates(m: SubstationMetrics): Candidate[] {
+function substationCandidates(m: SubstationMetrics, active: ActiveCodes): Candidate[] {
   const out: Candidate[] = [];
 
   if (
     m.frequency_Hz != null &&
-    (m.frequency_Hz < THRESHOLDS.grid_freq_min_Hz || m.frequency_Hz > THRESHOLDS.grid_freq_max_Hz)
+    (under(m.frequency_Hz, THRESHOLDS.grid_freq_min_Hz, DEADBAND.frequency_Hz, 'GRID_FREQ', active) ||
+      over(m.frequency_Hz, THRESHOLDS.grid_freq_max_Hz, DEADBAND.frequency_Hz, 'GRID_FREQ', active))
   ) {
     out.push({
       code: 'GRID_FREQ',
@@ -255,11 +280,14 @@ export interface SkidEvaluation extends Evaluation {
  * Evaluate a whole skid. An offline skid (no telemetry at all) short-circuits to COMMS_LOST —
  * thresholds must not be applied to absent data.
  */
-export function evaluateSkid(skid: {
-  pcs: PcsTelemetry | null;
-  battery: BatteryTelemetry | null;
-  transformer: TransformerTelemetry | null;
-}): SkidEvaluation {
+export function evaluateSkid(
+  skid: {
+    pcs: PcsTelemetry | null;
+    battery: BatteryTelemetry | null;
+    transformer: TransformerTelemetry | null;
+  },
+  active?: ActiveCodes,
+): SkidEvaluation {
   const offline = skid.pcs === null && skid.battery === null && skid.transformer === null;
 
   if (offline) {
@@ -278,8 +306,8 @@ export function evaluateSkid(skid: {
     };
   }
 
-  const battery = evaluate(skid.battery ? batteryCandidates(skid.battery) : [], skid.battery === null);
-  const pcs = evaluate(skid.pcs ? pcsCandidates(skid.pcs) : [], skid.pcs === null);
+  const battery = evaluate(skid.battery ? batteryCandidates(skid.battery, active) : [], skid.battery === null);
+  const pcs = evaluate(skid.pcs ? pcsCandidates(skid.pcs, active) : [], skid.pcs === null);
   // The catalog has no transformer rules; it reports its own state.
   const transformerState: AssetState = skid.transformer?.state ?? 'OFFLINE';
 
@@ -294,8 +322,8 @@ export function evaluateSkid(skid: {
   };
 }
 
-export function evaluateSubstation(metrics: SubstationMetrics): Evaluation {
-  return evaluate(substationCandidates(metrics), false);
+export function evaluateSubstation(metrics: SubstationMetrics, active?: ActiveCodes): Evaluation {
+  return evaluate(substationCandidates(metrics, active), false);
 }
 
 /** The data-center load reports no alarmable telemetry in the catalog. */

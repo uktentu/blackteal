@@ -169,5 +169,29 @@ export const THRESHOLDS = {
   igbt_temp_warn_C: 75,
 } as const;
 
+/**
+ * Deadbands (hysteresis) — how far a value must travel back past its threshold before an
+ * already-active alarm is allowed to clear.
+ *
+ * Standard alarm-rationalization practice (ISA-18.2), and load-bearing here. The initial
+ * snapshot puts SKID-2's cell_temp_delta_C at 8.1 against an 8.0 limit — a 0.1 margin that
+ * ordinary jitter crosses several times a second. Without a deadband the alarm chatters on
+ * and off, which is precisely the noise Stage 1 exists to eliminate.
+ *
+ * Each value is sized to the physics: bigger than the field's per-tick jitter, small enough
+ * that a genuine recovery still clears promptly.
+ */
+export const DEADBAND = {
+  cell_v: 0.015,
+  cell_temp_C: 0.6,
+  cell_temp_delta_C: 0.5,
+  soc_pct: 0.6,
+  soh_pct: 0.4,
+  insulation_MOhm: 0.06,
+  current_A: 25,
+  frequency_Hz: 0.02,
+  igbt_temp_C: 1.0,
+} as const;
+
 /** critical sorts above warning — checklist B2. */
 export const SEVERITY_ORDER: Record<Severity, number> = { critical: 0, warning: 1 };

@@ -24,7 +24,7 @@ import type {
 } from '../domain/types';
 import { makeRng, jitter, jitterClamped, round, type Rng } from './random';
 import { evaluateSkid, evaluateSubstation } from './rules';
-import { applyScenarios, type SimControl } from './scenarios';
+import { applyScenarios, drainTriggers, type SimControl } from './scenarios';
 
 /** Anchors are the brief's snapshot values — what each metric drifts back toward. */
 const ANCHOR = {
@@ -150,6 +150,25 @@ function jitterTransformer(rng: Rng, t: TransformerTelemetry, loading: number): 
  * mutated; the returned SiteState is always a fresh object graph so React sees a new reference.
  */
 export function simulateFrame(prev: SiteState, ctl: SimControl, seed: number): SiteState {
+  // Triggers drain first, so a dropped feed can still be restored on a tick that produces
+  // no frame.
+  drainTriggers(ctl);
+
+  /**
+   * Feed dropped: NO FRAME ARRIVES.
+   *
+   * Telemetry must not advance by so much as a jitter step. A banner reading "not live" above
+   * numbers that tick every second is worse than no banner at all — it tells the operator the
+   * data is stale while demonstrating the opposite, and it is the first thing a reviewer
+   * clicking "Simulate dropout" will notice.
+   *
+   * Returning the previous frame verbatim is also the honest model of a dropout: the last
+   * values the site sent are exactly what an operator would still be looking at.
+   */
+  if (ctl.dropout) {
+    return prev.stale ? prev : { ...prev, stale: true };
+  }
+
   const rng = makeRng(seed);
 
   // --- 1. jitter ---
@@ -286,13 +305,20 @@ export function solveBalance(state: SiteState): SiteState {
   };
 }
 
-/** Re-derive every asset's state and alarms from its current telemetry. */
+/**
+ * Re-derive every asset's state and alarms from its current telemetry.
+ *
+ * The asset's currently-active codes are passed in so the rule engine can apply hysteresis:
+ * an alarm already raised holds until the value clears its threshold by a deadband, instead
+ * of chattering on every jitter step.
+ */
 export function evaluateFrame(state: SiteState): SiteState {
   const assets: SiteState['assets'] = {};
 
   for (const id of SKID_IDS) {
     const sk = state.assets[id] as SkidAsset;
-    const evaluated = evaluateSkid(sk);
+    const active = new Set(sk.alarms.map((a) => a.code));
+    const evaluated = evaluateSkid(sk, active);
     assets[id] = {
       ...sk,
       state: evaluated.state,
@@ -304,7 +330,7 @@ export function evaluateFrame(state: SiteState): SiteState {
   }
 
   const sub = state.assets.SUBSTATION as SubstationAsset;
-  const subEval = evaluateSubstation(sub.metrics);
+  const subEval = evaluateSubstation(sub.metrics, new Set(sub.alarms.map((a) => a.code)));
   assets.SUBSTATION = { ...sub, state: subEval.state, alarms: subEval.alarms };
   assets.LOAD = state.assets.LOAD;
 

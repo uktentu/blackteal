@@ -356,3 +356,72 @@ describe('operating envelope is enforced, not advisory', () => {
     expect(Math.abs(residual)).toBeLessThan(0.5);
   });
 });
+
+describe('dropout freezes the feed', () => {
+  it('does not advance telemetry by even one jitter step while stale', () => {
+    const { frames } = run(14, (ctl, t) => {
+      if (t === 4) ctl.queued.push('dropout');
+    });
+
+    const atDropout = frames[3];
+    // Every subsequent frame must be byte-identical telemetry: a banner reading "not live"
+    // above numbers that keep ticking is worse than no banner at all.
+    for (const f of frames.slice(4)) {
+      expect(f.stale).toBe(true);
+      for (const id of SKID_IDS) {
+        expect(skid(f, id).pcs?.power_kW).toBe(skid(atDropout, id).pcs?.power_kW);
+        expect(skid(f, id).battery?.soc_pct).toBe(skid(atDropout, id).battery?.soc_pct);
+        expect(skid(f, id).battery?.cell_temp_max_C).toBe(skid(atDropout, id).battery?.cell_temp_max_C);
+      }
+      expect(sub(f).metrics.power_MW).toBe(sub(atDropout).metrics.power_MW);
+      expect(sub(f).metrics.voltage_kV).toBe(sub(atDropout).metrics.voltage_kV);
+    }
+  });
+
+  it('resumes ticking when the feed is restored', () => {
+    const { frames } = run(20, (ctl, t) => {
+      if (t === 4 || t === 12) ctl.queued.push('dropout');
+    });
+
+    expect(frames[8].stale).toBe(true);
+    const resumed = frames[frames.length - 1];
+    expect(resumed.stale).toBe(false);
+    // Telemetry moved again after the restore.
+    expect(skid(resumed, 'SKID-1').battery!.soc_pct).not.toBe(skid(frames[8], 'SKID-1').battery!.soc_pct);
+  });
+});
+
+describe('alarm hysteresis', () => {
+  it("does not chatter SKID-2's borderline TEMP_DELTA in the opening seconds", () => {
+    // The snapshot puts cell_temp_delta_C at 8.1 against an 8.0 limit — a 0.1 margin that
+    // raw jitter crosses several times a second. Before the scripted cooldown at t=10s the
+    // alarm must stay continuously raised, not blink.
+    const { frames } = run(9);
+
+    for (const [i, f] of frames.entries()) {
+      const codes = skid(f, 'SKID-2').alarms.map((a) => a.code);
+      expect(codes, `frame ${i + 1} lost TEMP_DELTA to jitter`).toContain('TEMP_DELTA');
+    }
+  });
+
+  it('still clears an alarm once the value genuinely recovers', () => {
+    // The scripted cooldown takes the spread well below the deadband.
+    const { last } = run(40);
+    expect(skid(last, 'SKID-2').alarms.map((a) => a.code)).not.toContain('TEMP_DELTA');
+    expect(skid(last, 'SKID-2').state).toBe('NORMAL');
+  });
+
+  it('holds an alarm inside the deadband but releases it beyond', () => {
+    const active = new Set<'TEMP_DELTA'>(['TEMP_DELTA']);
+    const at = (delta: number, live: boolean) =>
+      evaluateSkid(
+        { pcs: null, transformer: null, battery: { state: 'NORMAL', cell_temp_delta_C: delta } },
+        live ? active : undefined,
+      ).alarms.map((a) => a.code);
+
+    expect(at(8.2, false)).toContain('TEMP_DELTA'); // fires above the limit
+    expect(at(7.9, false)).not.toContain('TEMP_DELTA'); // would not fire on its own
+    expect(at(7.9, true)).toContain('TEMP_DELTA'); // but holds once live
+    expect(at(7.4, true)).not.toContain('TEMP_DELTA'); // clears past the deadband
+  });
+});
