@@ -23,6 +23,7 @@ export default function App() {
   const filters = useSiteStore((s) => s.filters);
   const acknowledged = useSiteStore((s) => s.acknowledged);
   const shelvedUntil = useSiteStore((s) => s.shelvedUntil);
+  const raisedAt = useSiteStore((s) => s.raisedAt);
   const events = useSiteStore((s) => s.events);
   const now = useSiteStore((s) => s.now);
   const history = useSiteStore((s) => s.history);
@@ -31,8 +32,8 @@ export default function App() {
   // zustand v5 would read as a changed snapshot on every render.
   const summary = useMemo(() => buildSummary(site), [site]);
   const groups = useMemo(
-    () => buildAlarmGroups(site, acknowledged, shelvedUntil, filters),
-    [site, acknowledged, shelvedUntil, filters],
+    () => buildAlarmGroups(site, acknowledged, shelvedUntil, raisedAt, filters),
+    [site, acknowledged, shelvedUntil, raisedAt, filters],
   );
 
   const start = useSiteStore((s) => s.start);

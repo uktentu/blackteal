@@ -15,6 +15,8 @@ export interface AlarmEntry {
   shelved: boolean;
   /** Wall-clock ms at which this shelve expires; null when not shelved. */
   shelvedUntil: number | null;
+  /** Wall-clock ms at which this alarm was first raised; null if not yet recorded. */
+  raisedAt: number | null;
 }
 
 export interface AlarmGroup {
@@ -35,12 +37,16 @@ export interface AlarmGroup {
   shelved: boolean;
   /** Soonest expiry among the group's members, for the countdown. */
   shelvedUntil: number | null;
+  /** Earliest onset among the group's members — when this condition started. */
+  raisedAt: number | null;
 }
 
 export interface FeedOptions {
   acknowledged: Set<string>;
   /** key -> wall-clock ms at which the shelve expires. Shelving is always time-boxed. */
   shelvedUntil: Map<string, number>;
+  /** key -> wall-clock ms at which the alarm was first raised. */
+  raisedAt: Map<string, number>;
   filters: { assetId: string | null; severity: Severity | null; showShelved: boolean };
 }
 
@@ -56,7 +62,7 @@ const key = (assetId: string, code: string) => `${assetId}:${code}`;
 export const FLOOD_THRESHOLD = 3;
 
 export function groupAlarms(site: SiteState, opts: FeedOptions): AlarmGroup[] {
-  const { acknowledged, shelvedUntil, filters } = opts;
+  const { acknowledged, shelvedUntil, raisedAt, filters } = opts;
 
   // --- flatten ---
   const entries: AlarmEntry[] = [];
@@ -69,6 +75,7 @@ export function groupAlarms(site: SiteState, opts: FeedOptions): AlarmGroup[] {
         acknowledged: acknowledged.has(key(assetId, alarm.code)),
         shelved: until !== null,
         shelvedUntil: until,
+        raisedAt: raisedAt.get(key(assetId, alarm.code)) ?? null,
       });
     }
   }
@@ -109,6 +116,7 @@ export function groupAlarms(site: SiteState, opts: FeedOptions): AlarmGroup[] {
         acknowledged: list.every((e) => e.acknowledged),
         shelved: list.every((e) => e.shelved),
         shelvedUntil: soonestExpiry(list),
+        raisedAt: earliestOnset(list),
       });
       continue;
     }
@@ -126,6 +134,7 @@ export function groupAlarms(site: SiteState, opts: FeedOptions): AlarmGroup[] {
         acknowledged: e.acknowledged,
         shelved: e.shelved,
         shelvedUntil: e.shelvedUntil,
+        raisedAt: e.raisedAt,
       });
     }
   }
@@ -152,6 +161,12 @@ export function groupAlarms(site: SiteState, opts: FeedOptions): AlarmGroup[] {
 /** Soonest expiry in a group, so the countdown shows when the first member wakes up. */
 function soonestExpiry(list: AlarmEntry[]): number | null {
   const times = list.map((e) => e.shelvedUntil).filter((t): t is number => t !== null);
+  return times.length === 0 ? null : Math.min(...times);
+}
+
+/** Earliest onset in a group — when the condition first appeared anywhere in it. */
+function earliestOnset(list: AlarmEntry[]): number | null {
+  const times = list.map((e) => e.raisedAt).filter((t): t is number => t !== null);
   return times.length === 0 ? null : Math.min(...times);
 }
 

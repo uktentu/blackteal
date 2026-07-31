@@ -245,6 +245,70 @@ describe('Stage 1: alarm console', () => {
   });
 });
 
+describe('alarm console alignment', () => {
+  it('uses the same column cells in both tabs, so nothing shifts when switching', async () => {
+    const { user } = renderApp();
+
+    const cellsOf = (row: HTMLElement) =>
+      ['row-time', 'row-status', 'row-asset', 'row-code', 'row-msg'].map((c) =>
+        row.querySelector(`.${c}`) === null ? `MISSING:${c}` : c,
+      );
+
+    const activeRow = screen
+      .getAllByRole('listitem')
+      .find((li) => li.classList.contains('alarm'))!;
+    const activeCells = cellsOf(activeRow);
+
+    // Generate an event so History has something to render.
+    act(() => {
+      const site = structuredClone(INITIAL_SNAPSHOT);
+      (site.assets['SKID-1'] as { battery: { soc_pct: number } }).battery.soc_pct = 6;
+      useSiteStore.setState({ site });
+      useSiteStore.getState().tickOnce();
+    });
+
+    await user.click(screen.getByRole('tab', { name: 'History' }));
+    const eventRow = screen.getAllByRole('listitem').find((li) => li.classList.contains('event'))!;
+
+    expect(cellsOf(eventRow)).toEqual(activeCells);
+    expect(activeCells).not.toContain(expect.stringContaining('MISSING'));
+  });
+
+  it('stamps an active alarm with when it started', () => {
+    renderApp();
+    act(() => useSiteStore.getState().tickOnce());
+
+    const row = screen.getAllByRole('listitem').find((li) => li.classList.contains('alarm'))!;
+    // "When did this start?" must be answerable from the row itself.
+    expect(row.querySelector('.row-time')!.textContent).toMatch(
+      /\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/,
+    );
+  });
+
+  it('forgets the onset when an alarm clears, so a recurrence is timed from its own start', () => {
+    renderApp();
+
+    // Drive telemetry across the threshold — hand-set alarms are overwritten by the rules.
+    // (SKID-5's COMMS_LOST cannot be used here: it is genuinely offline, so the rule engine
+    // re-raises it every tick and it correctly never clears.)
+    act(() => {
+      const site = structuredClone(INITIAL_SNAPSHOT);
+      (site.assets['SKID-1'] as { battery: { soc_pct: number } }).battery.soc_pct = 6;
+      useSiteStore.setState({ site });
+      useSiteStore.getState().tickOnce();
+    });
+    expect(useSiteStore.getState().raisedAt.has('SKID-1:SOC_LOW')).toBe(true);
+
+    act(() => {
+      const site = structuredClone(useSiteStore.getState().site);
+      (site.assets['SKID-1'] as { battery: { soc_pct: number } }).battery.soc_pct = 61;
+      useSiteStore.setState({ site });
+      useSiteStore.getState().tickOnce();
+    });
+    expect(useSiteStore.getState().raisedAt.has('SKID-1:SOC_LOW')).toBe(false);
+  });
+});
+
 describe('core requirement: stale feed is never presented as live', () => {
   it('flags a dropout site-wide and in the drawer', async () => {
     const { user } = renderApp();

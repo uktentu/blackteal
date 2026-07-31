@@ -16,7 +16,7 @@ npm run dev          # http://localhost:5173
 ```
 
 ```bash
-npm test             # 127 tests: pure logic + component/interaction tests
+npm test             # 134 tests: pure logic + component/interaction tests
 npm run build        # typecheck + production build to dist/
 npm run check        # typecheck + lint + tests
 ```
@@ -93,7 +93,14 @@ a whole shift:
 - **Alarm rows never reorder under the pointer.** See Scaling notes below.
 - **Screen-reader announcements** for newly raised alarms, via an assertive live region.
 - **Focus moves into the drawer** when it opens and returns when it closes.
-- **Wall clock** in the header, and every event carries a timestamp.
+- **Wall clock** in the header; every alarm row and log entry is stamped
+  `YYYY-MM-DD HH:MM:SS`, in ISO order rather than a locale format because 03/04 is ambiguous
+  between continents and a log is exactly where that becomes a misread incident report.
+- **Active and History share one column grid.** They were separate layouts, so `asset` sat at
+  32px in one view and 264px in the other and every column jumped when you switched tabs. On a
+  panel an operator scans by position, that is a real cost.
+- **Every active alarm says when it started** — the onset time is tracked per alarm and
+  forgotten when it clears, so a recurrence is timed from its own start.
 
 ## Design notes (Stage 2)
 
@@ -153,7 +160,7 @@ click-to-open: capturing the pointer on the SVG root retargets the click away fr
 **History is in-memory only**, 60 samples per asset for the sparklines. Nothing persists across
 a reload. A real deployment reads a historian.
 
-**Component tests instead of full E2E.** 127 tests: the pure logic (simulator, rules, alarm
+**Component tests instead of full E2E.** 134 tests: the pure logic (simulator, rules, alarm
 feed, event log) plus 26 component tests driving the real DOM via Testing Library — click an
 asset opens its panel, a missing metric renders a dash, a flood groups, Escape closes. These
 exist because a zoom feature once broke click-to-open while every logic test stayed green.

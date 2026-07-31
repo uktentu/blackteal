@@ -15,7 +15,7 @@ import type { Severity } from '../domain/types';
 import { alarmCounts, type AlarmGroup } from '../sim/alarmFeed';
 import type { AlarmEvent } from '../sim/alarmHistory';
 import { EventLog } from './EventLog';
-import { fmtCountdown } from './format';
+import { fmtClock, fmtCountdown, fmtDate } from './format';
 import { clampConsoleHeight, CONSOLE_MIN, consoleMax } from '../store/persist';
 import type { AlarmFilters } from '../store/useSiteStore';
 import './console.css';
@@ -346,41 +346,53 @@ const AlarmRow = memo(function AlarmRow({
       data-shelved={group.shelved || undefined}
       data-grouped={group.grouped || undefined}
     >
-      <span className="alarm-dot" aria-hidden="true" />
+      {/* Column 1 — onset. Shares the grid with the History tab's event time, so the two
+          views of this panel line up instead of jumping when you switch tabs. */}
+      <span className="row-time metric">
+        {group.raisedAt === null ? (
+          <span className="row-time-pending">—</span>
+        ) : (
+          <>
+            <span className="row-date">{fmtDate(group.raisedAt)} </span>
+            {fmtClock(group.raisedAt)}
+          </>
+        )}
+      </span>
+
+      <span className="row-status">
+        <span className="alarm-dot" aria-hidden="true" />
+        {group.severity}
+      </span>
 
       {/* Clicking the row focuses that asset on the diagram. Grouped rows have no single
           asset to focus, so only single rows are clickable. */}
       <button
         type="button"
-        className="alarm-asset metric"
+        className="row-asset metric"
         disabled={group.assetId === null}
         onClick={() => group.assetId !== null && onFocusAsset(group.assetId)}
       >
         {group.assetId ?? `${group.entries.length} assets`}
       </button>
 
-      <span className="alarm-code metric">{group.code}</span>
-
-      {group.grouped && (
-        <span className="alarm-count metric" title={`${group.count} occurrences rolled up`}>
-          ×{group.count}
-        </span>
-      )}
+      <span className="row-code metric">{group.code}</span>
 
       {/* title gives the full text an escape hatch: the row truncates with an ellipsis. */}
-      <span className="alarm-msg" title={group.message}>
+      <span className="row-msg" title={group.message}>
+        {group.grouped && (
+          <span className="alarm-count metric" title={`${group.count} occurrences rolled up`}>
+            ×{group.count}
+          </span>
+        )}
         {group.message}
       </span>
 
-      {group.shelved && group.shelvedUntil !== null && (
-        <span className="alarm-shelf-timer" title="Shelve expires automatically">
-          {fmtCountdown(group.shelvedUntil - now)}
-        </span>
-      )}
-
-      <span className="alarm-severity">{group.severity}</span>
-
       <span className="alarm-actions">
+        {group.shelved && group.shelvedUntil !== null && (
+          <span className="alarm-shelf-timer" title="Shelve expires automatically">
+            {fmtCountdown(group.shelvedUntil - now)}
+          </span>
+        )}
         {group.shelved ? (
           <button type="button" onClick={() => onUnshelve(group)}>
             Unshelve

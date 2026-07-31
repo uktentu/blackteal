@@ -14,6 +14,7 @@ import { groupAlarms, alarmCounts, FLOOD_THRESHOLD } from './alarmFeed';
 const NO_OPTS = {
   acknowledged: new Set<string>(),
   shelvedUntil: new Map<string, number>(),
+  raisedAt: new Map<string, number>(),
   filters: { assetId: null, severity: null, showShelved: true },
 };
 

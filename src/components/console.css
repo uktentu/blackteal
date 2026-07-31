@@ -203,14 +203,33 @@
   margin: 0;
 }
 
-.alarm {
-  display: flex;
+/**
+ * ONE column grid, shared by the Active and History rows.
+ *
+ * Before this the two tabs were separate flex layouts, so `asset` sat at 32px in one view and
+ * 264px in the other: switching tabs made every column jump. On a panel an operator scans by
+ * position, that is a real cost. Both row types now declare the same template, so a column
+ * means the same place in either view.
+ */
+.alarm,
+.event {
+  display: grid;
+  grid-template-columns:
+    [time] 140px
+    [status] 96px
+    [asset] 84px
+    [code] 128px
+    [msg] minmax(0, 1fr)
+    [trail] auto;
   align-items: center;
   gap: var(--bt-3);
-  height: 32px;
+  min-height: 30px;
   padding: 0 var(--bt-4) 0 var(--bt-3);
   border-bottom: 1px solid var(--bt-rule);
   border-left: 2px solid transparent;
+}
+
+.alarm {
   /* Rows fade+slide in: a flood that snaps into existence reads as broken even when the
      logic is right. */
   animation: bt-row-in var(--bt-t-row) var(--bt-ease);
@@ -223,12 +242,72 @@
   }
 }
 
-.alarm[data-severity='critical'] {
-  border-left-color: var(--bt-fault);
+/* ---- shared cells ---- */
+
+.row-time {
+  font-size: 11px;
+  color: var(--bt-text-faint);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
-.alarm[data-severity='warning'] {
-  border-left-color: var(--bt-warning);
+.row-time-pending {
+  color: var(--bt-text-faint);
+}
+
+.row-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bt-text-faint);
+  white-space: nowrap;
+}
+
+.row-asset {
+  font: inherit;
+  font-family: var(--bt-mono);
+  font-size: 11px;
+  text-align: left;
+  color: var(--bt-text);
+  background: transparent;
+  border: none;
+  padding: 2px 0;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-asset:disabled {
+  color: var(--bt-text-muted);
+  cursor: default;
+}
+
+.row-asset:not(:disabled):hover {
+  color: var(--bt-accent);
+  text-decoration: underline;
+}
+
+.row-code {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--bt-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-msg {
+  font-size: 12px;
+  color: var(--bt-text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .alarm-dot {
@@ -238,80 +317,43 @@
   flex: none;
 }
 
+.alarm[data-severity='critical'] {
+  border-left-color: var(--bt-fault);
+}
 .alarm[data-severity='critical'] .alarm-dot {
   background: var(--bt-fault);
 }
+.alarm[data-severity='critical'] .row-status {
+  color: var(--bt-fault);
+}
 
+.alarm[data-severity='warning'] {
+  border-left-color: var(--bt-warning);
+}
 .alarm[data-severity='warning'] .alarm-dot {
   background: transparent;
   border: 1.5px solid var(--bt-warning);
 }
-
-.alarm-asset {
-  font: inherit;
-  font-family: var(--bt-mono);
-  font-size: 11px;
-  width: 78px;
-  flex: none;
-  text-align: left;
-  color: var(--bt-text);
-  background: transparent;
-  border: none;
-  padding: 2px 0;
-  cursor: pointer;
-}
-
-.alarm-asset:disabled {
-  color: var(--bt-text-muted);
-  cursor: default;
-}
-
-.alarm-asset:not(:disabled):hover {
-  color: var(--bt-accent);
-  text-decoration: underline;
-}
-
-.alarm-code {
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  color: var(--bt-text-muted);
-  width: 120px;
-  flex: none;
+.alarm[data-severity='warning'] .row-status {
+  color: var(--bt-warning);
 }
 
 .alarm-count {
   font-size: 10px;
   font-weight: 600;
   padding: 1px 5px;
-  flex: none;
+  margin-right: var(--bt-2);
   color: var(--bt-text);
   border: 1px solid var(--bt-rule-strong);
   border-radius: 2px;
 }
 
-.alarm-msg {
-  font-size: 12px;
-  color: var(--bt-text);
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.alarm-severity {
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--bt-text-faint);
-  flex: none;
-}
-
 .alarm-actions {
   display: flex;
+  align-items: center;
   gap: var(--bt-1);
-  flex: none;
+  justify-content: flex-end;
+  min-width: 132px;
 }
 
 .alarm-actions button {
@@ -336,13 +378,19 @@
   cursor: default;
 }
 
+.alarm-shelf-timer {
+  font-family: var(--bt-mono);
+  font-size: 10px;
+  color: var(--bt-text-faint);
+}
+
 /* Acknowledged: seen, so it stops demanding attention — but it is still active. */
 .alarm[data-acked] {
   border-left-color: var(--bt-rule-strong);
 }
 
-.alarm[data-acked] .alarm-msg,
-.alarm[data-acked] .alarm-asset {
+.alarm[data-acked] .row-msg,
+.alarm[data-acked] .row-asset {
   color: var(--bt-text-muted);
 }
 
@@ -358,10 +406,10 @@
   border-left-color: transparent;
 }
 
-.alarm[data-shelved] .alarm-msg,
-.alarm[data-shelved] .alarm-code,
-.alarm[data-shelved] .alarm-asset,
-.alarm[data-shelved] .alarm-severity {
+.alarm[data-shelved] .row-msg,
+.alarm[data-shelved] .row-code,
+.alarm[data-shelved] .row-asset,
+.alarm[data-shelved] .row-status {
   color: var(--bt-text-faint);
 }
 

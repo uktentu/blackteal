@@ -1,9 +1,18 @@
+/**
+ * Wraps at any width rather than at one breakpoint.
+ *
+ * A fixed 52px height with a single 720px breakpoint left a dead band: between roughly 800 and
+ * 1100px the content no longer fitted on one line but had not yet been told to wrap, so the
+ * right-hand cluster overflowed the strip and sat on top of the diagram. Auto height with
+ * wrapping has no such band — it is one line whenever it fits and grows when it doesn't.
+ */
 .topstrip {
   display: flex;
   align-items: center;
-  gap: var(--bt-6);
-  padding: 0 var(--bt-4);
-  height: 52px;
+  flex-wrap: wrap;
+  gap: var(--bt-2) var(--bt-5);
+  padding: var(--bt-1) var(--bt-4);
+  min-height: 52px;
   flex: none;
   border-bottom: 1px solid var(--bt-rule);
   background: var(--bt-surface);

@@ -51,6 +51,8 @@ interface SiteStore {
   acknowledged: Set<string>;
   /** key -> wall-clock ms at which the shelve expires. */
   shelvedUntil: Map<string, number>;
+  /** key -> wall-clock ms at which the alarm was first raised. "When did this start?" */
+  raisedAt: Map<string, number>;
 
   /** Per-asset metric history for sparklines. */
   history: Record<string, number[]>;
@@ -112,6 +114,7 @@ export const useSiteStore = create<SiteStore>((set, get) => ({
 
   acknowledged: new Set(),
   shelvedUntil: new Map(),
+  raisedAt: new Map(),
   history: {},
   events: [],
 
@@ -146,6 +149,17 @@ export const useSiteStore = create<SiteStore>((set, get) => ({
     );
     const acknowledged = new Set([...prev.acknowledged].filter((k) => live.has(k)));
 
+    // First-raised time per alarm, so an active row can say when it started. Dropped when the
+    // alarm clears, so a recurrence is timed from its own onset rather than the original.
+    let raisedAt = prev.raisedAt;
+    const newKeys = [...live].filter((k) => !prev.raisedAt.has(k));
+    const goneKeys = [...prev.raisedAt.keys()].filter((k) => !live.has(k));
+    if (newKeys.length > 0 || goneKeys.length > 0) {
+      raisedAt = new Map(prev.raisedAt);
+      for (const k of goneKeys) raisedAt.delete(k);
+      for (const k of newKeys) raisedAt.set(k, at);
+    }
+
     let shelvedUntil = prev.shelvedUntil;
     const expired = [...prev.shelvedUntil].filter(([, until]) => until <= at);
     if (expired.length > 0) {
@@ -159,6 +173,7 @@ export const useSiteStore = create<SiteStore>((set, get) => ({
       events,
       acknowledged,
       shelvedUntil,
+      raisedAt,
       tick: prev.tick + 1,
       now: at,
       /**
@@ -241,7 +256,8 @@ export function buildAlarmGroups(
   site: SiteState,
   acknowledged: Set<string>,
   shelvedUntil: Map<string, number>,
+  raisedAt: Map<string, number>,
   filters: AlarmFilters,
 ): AlarmGroup[] {
-  return groupAlarms(site, { acknowledged, shelvedUntil, filters });
+  return groupAlarms(site, { acknowledged, shelvedUntil, raisedAt, filters });
 }

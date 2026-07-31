@@ -4,91 +4,44 @@
   padding: 0;
 }
 
-.event {
-  display: flex;
-  align-items: center;
-  gap: var(--bt-3);
-  height: 28px;
-  padding: 0 var(--bt-4) 0 var(--bt-3);
-  border-bottom: 1px solid var(--bt-rule);
-  border-left: 2px solid transparent;
-  font-size: 12px;
-}
-
-/* Sized for the full "YYYY-MM-DD HH:MM:SS" stamp; nowrap so it can never wrap into the row
-   below it. Tabular figures keep the column edges straight down the log. */
-.event-time {
-  font-size: 11px;
-  color: var(--bt-text-faint);
-  flex: none;
-  width: 140px;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-/* The drawer is narrow: drop to time-only there, where the date is the same day anyway. */
-.drawer .event-time {
-  width: 62px;
-}
-
-.drawer .event-time .event-date {
-  display: none;
-}
-
-/* The transition is the point of this row, so it gets the strongest treatment here. */
-.event-kind {
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  flex: none;
-  width: 86px;
-  color: var(--bt-text-muted);
-}
-
+/* Layout comes from the shared row grid in console.css; only the tinting lives here. */
 .event[data-kind='raised'][data-severity='critical'] {
   border-left-color: var(--bt-fault);
 }
-.event[data-kind='raised'][data-severity='critical'] .event-kind {
+.event[data-kind='raised'][data-severity='critical'] .row-status {
   color: var(--bt-fault);
 }
 .event[data-kind='raised'][data-severity='warning'] {
   border-left-color: var(--bt-warning);
 }
-.event[data-kind='raised'][data-severity='warning'] .event-kind {
+.event[data-kind='raised'][data-severity='warning'] .row-status {
   color: var(--bt-warning);
 }
 
 /* Cleared is good news, so it stays quiet — the log is scanned for problems, not resolutions. */
-.event[data-kind='cleared'] .event-kind,
-.event[data-kind='acknowledged'] .event-kind,
-.event[data-kind='shelved'] .event-kind,
-.event[data-kind='unshelved'] .event-kind {
+.event[data-kind='cleared'] .row-status,
+.event[data-kind='acknowledged'] .row-status,
+.event[data-kind='shelved'] .row-status,
+.event[data-kind='unshelved'] .row-status {
   color: var(--bt-text-faint);
 }
 
-.event-asset {
-  font-size: 11px;
-  width: 78px;
-  flex: none;
-  color: var(--bt-text);
+.event .row-msg {
+  color: var(--bt-text-muted);
 }
 
-.event-code {
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  color: var(--bt-text-muted);
-  width: 120px;
-  flex: none;
+/* The drawer is narrow: drop the date there, where every event is same-day anyway. */
+.drawer .alarm,
+.drawer .event {
+  grid-template-columns: 62px 88px minmax(0, 1fr);
+  padding-right: var(--bt-3);
 }
 
-.event-msg {
-  color: var(--bt-text-muted);
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.drawer .row-date,
+.drawer .row-asset,
+.drawer .row-code,
+.drawer .alarm-actions {
+  display: none;
 }
 
 /* ---- tabs ---- */
@@ -120,12 +73,4 @@
 
 .console-tab:hover {
   color: var(--bt-text);
-}
-
-/* Shelve countdown — informational, quiet tier. */
-.alarm-shelf-timer {
-  font-family: var(--bt-mono);
-  font-size: 10px;
-  color: var(--bt-text-faint);
-  flex: none;
 }
