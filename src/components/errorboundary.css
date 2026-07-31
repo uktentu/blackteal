@@ -1,0 +1,80 @@
+/**
+ * Error state. Uses the fault tone because a dead display IS a fault condition — this is the
+ * one place a large coloured region is warranted, since nothing else on the panel is
+ * trustworthy any more.
+ */
+
+.boundary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 200px;
+  padding: var(--bt-5);
+  background: var(--bt-bg);
+  border: 1px solid var(--bt-fault);
+}
+
+.boundary-inner {
+  max-width: 60ch;
+}
+
+.boundary-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--bt-fault);
+  margin: 0 0 var(--bt-2);
+}
+
+.boundary-body {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--bt-text);
+  margin: 0 0 var(--bt-3);
+}
+
+.boundary-details {
+  font-size: 11px;
+  color: var(--bt-text-muted);
+  margin-bottom: var(--bt-3);
+}
+
+.boundary-details summary {
+  cursor: pointer;
+  padding: var(--bt-1) 0;
+}
+
+.boundary-details pre {
+  max-height: 180px;
+  overflow: auto;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--bt-text-faint);
+  background: var(--bt-surface);
+  border: 1px solid var(--bt-rule);
+  border-radius: 2px;
+  padding: var(--bt-2);
+  margin: var(--bt-2) 0 0;
+  white-space: pre-wrap;
+}
+
+.boundary-actions {
+  display: flex;
+  gap: var(--bt-2);
+}
+
+.boundary-actions button {
+  font: inherit;
+  font-size: 11px;
+  padding: 6px var(--bt-3);
+  min-height: 30px;
+  color: var(--bt-text);
+  background: transparent;
+  border: 1px solid var(--bt-rule-strong);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.boundary-actions button:hover {
+  border-color: var(--bt-accent);
+}

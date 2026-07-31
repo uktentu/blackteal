@@ -160,3 +160,17 @@
   color: var(--bt-accent);
   border-color: var(--bt-accent);
 }
+
+.topstrip-clock {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-right: var(--bt-4);
+  border-right: 1px solid var(--bt-rule);
+}
+
+.topstrip-time {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--bt-text-muted);
+}

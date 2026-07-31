@@ -8,6 +8,9 @@ import { DetailDrawer } from './components/DetailDrawer';
 import { Legend } from './components/Legend';
 import { AlarmConsole } from './components/AlarmConsole';
 import type { AlarmGroup } from './sim/alarmFeed';
+import { forAsset, recent } from './sim/alarmHistory';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import type { ConsoleTab } from './components/AlarmConsole';
 import './components/app.css';
 
 const LABELS = Object.fromEntries(TOPOLOGY.assets.map((a) => [a.id, a.label]));
@@ -19,15 +22,17 @@ export default function App() {
   const selectedId = useSiteStore((s) => s.selectedId);
   const filters = useSiteStore((s) => s.filters);
   const acknowledged = useSiteStore((s) => s.acknowledged);
-  const shelved = useSiteStore((s) => s.shelved);
+  const shelvedUntil = useSiteStore((s) => s.shelvedUntil);
+  const events = useSiteStore((s) => s.events);
+  const now = useSiteStore((s) => s.now);
   const history = useSiteStore((s) => s.history);
 
   // Derived here, not in a store selector: both allocate a new object graph per call, which
   // zustand v5 would read as a changed snapshot on every render.
   const summary = useMemo(() => buildSummary(site), [site]);
   const groups = useMemo(
-    () => buildAlarmGroups(site, acknowledged, shelved, filters),
-    [site, acknowledged, shelved, filters],
+    () => buildAlarmGroups(site, acknowledged, shelvedUntil, filters),
+    [site, acknowledged, shelvedUntil, filters],
   );
 
   const start = useSiteStore((s) => s.start);
@@ -71,6 +76,36 @@ export default function App() {
   );
 
   const [flashedId, setFlashedId] = useState<string | null>(null);
+  const [tab, setTab] = useState<ConsoleTab>('active');
+
+  const recentEvents = useMemo(() => recent(events), [events]);
+  const assetEvents = useMemo(
+    () => (selectedId === null ? [] : forAsset(events, selectedId)),
+    [events, selectedId],
+  );
+
+  /**
+   * Screen-reader announcement for newly raised alarms.
+   *
+   * A non-visual operator otherwise gets nothing: counts change and rows arrive in silence.
+   * Only *raised* events are announced, and only the newest — narrating every clear as well
+   * would turn a flood into an unusable stream of speech.
+   */
+  const [announcement, setAnnouncement] = useState('');
+  const lastAnnouncedSeq = useRef(-1);
+
+  useEffect(() => {
+    const raised = events.filter((e) => e.kind === 'raised' && e.seq > lastAnnouncedSeq.current);
+    if (raised.length === 0) return;
+    lastAnnouncedSeq.current = events[events.length - 1].seq;
+
+    const newest = raised[raised.length - 1];
+    setAnnouncement(
+      raised.length === 1
+        ? `${newest.severity} alarm on ${newest.assetId}: ${newest.message}`
+        : `${raised.length} new alarms. Most recent: ${newest.severity} on ${newest.assetId}, ${newest.message}`,
+    );
+  }, [events]);
 
   /**
    * Jumping from an alarm row to its asset: select it AND flash it.
@@ -125,6 +160,30 @@ export default function App() {
     [unshelve],
   );
 
+  /**
+   * Move focus into the drawer when it opens and return it when it closes.
+   *
+   * Without this a keyboard operator opens a panel and their focus is still on the diagram,
+   * so Tab walks the page behind the thing they just opened.
+   */
+  const drawerRef = useRef<HTMLElement | null>(null);
+  const returnFocusTo = useRef<HTMLElement | null>(null);
+  const prevSelected = useRef<string | null>(null);
+
+  useEffect(() => {
+    const opened = prevSelected.current === null && selectedId !== null;
+    const closed = prevSelected.current !== null && selectedId === null;
+    prevSelected.current = selectedId;
+
+    if (opened) {
+      returnFocusTo.current = document.activeElement as HTMLElement | null;
+      drawerRef.current?.querySelector<HTMLElement>('.drawer-close')?.focus();
+    } else if (closed) {
+      returnFocusTo.current?.focus();
+      returnFocusTo.current = null;
+    }
+  }, [selectedId]);
+
   const selectedAsset = useMemo(
     () => (selectedId === null ? null : (site.assets[selectedId] ?? null)),
     [selectedId, site],
@@ -139,26 +198,39 @@ export default function App() {
         needsAttention={summary.needsAttention}
         worst={summary.worst}
         stale={stale}
-        staleForMs={Date.now() - lastFrameAt}
+        staleForMs={now - lastFrameAt}
+        now={now}
         onSimulateBurst={() => trigger('burst')}
         onSimulateDropout={() => trigger('dropout')}
       />
 
+      {/*
+        Live region for alarm announcements. Visually hidden, assertive because a new critical
+        alarm should interrupt rather than queue behind whatever is being read.
+      */}
+      <div className="sr-only" role="status" aria-live="assertive" aria-atomic="true">
+        {announcement}
+      </div>
+
       <div className="app-body">
         <section className="app-diagram" aria-label="Site diagram">
           <div className="app-canvas">
-            <Diagram
-              site={site}
-              selectedId={selectedId}
-              flashedId={flashedId}
-              stale={stale}
-              onSelect={select}
-            />
+            <ErrorBoundary label="The site diagram">
+              <Diagram
+                site={site}
+                selectedId={selectedId}
+                flashedId={flashedId}
+                stale={stale}
+                onSelect={select}
+              />
+            </ErrorBoundary>
           </div>
           <Legend flowing={!stale} />
         </section>
 
         <DetailDrawer
+          ref={drawerRef}
+          events={assetEvents}
           assetId={selectedId}
           label={selectedId === null ? '' : (LABELS[selectedId] ?? selectedId)}
           asset={selectedAsset}
@@ -169,8 +241,13 @@ export default function App() {
         />
       </div>
 
-      <AlarmConsole
+      <ErrorBoundary label="The alarm console">
+        <AlarmConsole
         groups={groups}
+        events={recentEvents}
+        tab={tab}
+        onTab={setTab}
+        now={now}
         filters={filters}
         collapsed={consoleCollapsed}
         height={consoleHeight}
@@ -181,7 +258,8 @@ export default function App() {
         onShelve={onShelve}
         onUnshelve={onUnshelve}
         onFocusAsset={focusAsset}
-      />
+        />
+      </ErrorBoundary>
     </div>
   );
 }

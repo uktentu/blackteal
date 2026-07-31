@@ -13,9 +13,13 @@ import { groupAlarms, alarmCounts, FLOOD_THRESHOLD } from './alarmFeed';
 
 const NO_OPTS = {
   acknowledged: new Set<string>(),
-  shelved: new Set<string>(),
+  shelvedUntil: new Map<string, number>(),
   filters: { assetId: null, severity: null, showShelved: true },
 };
+
+/** Shelve helper: shelving is time-boxed, so tests supply a future expiry. */
+const shelve = (...keys: string[]) =>
+  new Map(keys.map((k) => [k, Date.now() + 60_000] as const));
 
 /** Build a site where the listed skids each carry the given alarms. */
 function siteWith(spec: Record<string, Alarm[]>): SiteState {
@@ -120,7 +124,7 @@ describe('priority sort', () => {
     const site = siteWith({ 'SKID-1': [crit('CELL_OV')], 'SKID-2': [warn('TEMP_HIGH')] });
     const groups = groupAlarms(site, {
       ...NO_OPTS,
-      shelved: new Set(['SKID-1:CELL_OV']),
+      shelvedUntil: shelve('SKID-1:CELL_OV'),
     });
 
     expect(groups[0].shelved).toBe(false);
@@ -173,10 +177,10 @@ describe('filters', () => {
   });
 
   it('can hide shelved rows, but shows them by default', () => {
-    const shelved = new Set(['SKID-1:TEMP_HIGH']);
-    expect(groupAlarms(site, { ...NO_OPTS, shelved })).toHaveLength(3);
+    const shelvedUntil = shelve('SKID-1:TEMP_HIGH');
+    expect(groupAlarms(site, { ...NO_OPTS, shelvedUntil })).toHaveLength(3);
     expect(
-      groupAlarms(site, { ...NO_OPTS, shelved, filters: { ...NO_OPTS.filters, showShelved: false } }),
+      groupAlarms(site, { ...NO_OPTS, shelvedUntil, filters: { ...NO_OPTS.filters, showShelved: false } }),
     ).toHaveLength(2);
   });
 });
@@ -216,7 +220,7 @@ describe('header counts', () => {
 
   it('excludes shelved alarms from the active counts', () => {
     const site = siteWith({ 'SKID-1': [crit('CELL_OV')], 'SKID-2': [warn('TEMP_HIGH')] });
-    const counts = alarmCounts(groupAlarms(site, { ...NO_OPTS, shelved: new Set(['SKID-1:CELL_OV']) }));
+    const counts = alarmCounts(groupAlarms(site, { ...NO_OPTS, shelvedUntil: shelve('SKID-1:CELL_OV') }));
 
     expect(counts.critical).toBe(0);
     expect(counts.shelved).toBe(1);

@@ -8,7 +8,7 @@
  * a persistent highlight ring while this is open.
  */
 
-import { memo } from 'react';
+import { memo, type Ref } from 'react';
 import { NAMEPLATE, assetKind } from '../domain/topology';
 import type { Alarm, Asset, SkidAsset, SubstationAsset, LoadAsset } from '../domain/types';
 import { StatusIndicator } from './StatusIndicator';
@@ -16,10 +16,16 @@ import { Sparkline } from './Sparkline';
 import { Headroom } from './Headroom';
 import { derateCause, headroom } from '../sim/rules';
 import { explainAsset } from '../sim/explain';
+import type { AlarmEvent } from '../sim/alarmHistory';
+import { EventLog } from './EventLog';
 import { fmt, fmtAgo, fmtInt, NO_DATA, powerDirection, gridDirection } from './format';
 import './drawer.css';
 
 interface Props {
+  /** Set by App so focus can be moved into the panel when it opens. */
+  ref?: Ref<HTMLElement>;
+  /** This asset's alarm history — a self-clearing alarm otherwise leaves no trace. */
+  events: AlarmEvent[];
   assetId: string | null;
   label: string;
   asset: Asset | null;
@@ -31,6 +37,8 @@ interface Props {
 }
 
 export const DetailDrawer = memo(function DetailDrawer({
+  ref,
+  events,
   assetId,
   label,
   asset,
@@ -43,6 +51,7 @@ export const DetailDrawer = memo(function DetailDrawer({
 
   return (
     <aside
+      ref={ref}
       className="drawer"
       data-open={open || undefined}
       aria-hidden={!open}
@@ -68,6 +77,12 @@ export const DetailDrawer = memo(function DetailDrawer({
             <ConnectionHealth asset={asset} stale={stale} lastFrameAt={lastFrameAt} />
             <TrendSection asset={asset} history={history} />
             <AlarmSection alarms={asset.alarms} />
+
+            <section className="drawer-section">
+              <h3 className="label">Recent alarm activity</h3>
+              <EventLog events={events} assetId={assetId} />
+            </section>
+
             <Telemetry assetId={assetId} asset={asset} />
           </div>
 

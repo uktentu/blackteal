@@ -13,12 +13,22 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { TOPOLOGY } from '../domain/topology';
 import type { Severity } from '../domain/types';
 import { alarmCounts, type AlarmGroup } from '../sim/alarmFeed';
+import type { AlarmEvent } from '../sim/alarmHistory';
+import { EventLog } from './EventLog';
+import { fmtCountdown } from './format';
 import { clampConsoleHeight, CONSOLE_MIN, consoleMax } from '../store/persist';
 import type { AlarmFilters } from '../store/useSiteStore';
 import './console.css';
 
+export type ConsoleTab = 'active' | 'history';
+
 interface Props {
   groups: AlarmGroup[];
+  events: AlarmEvent[];
+  tab: ConsoleTab;
+  onTab: (t: ConsoleTab) => void;
+  /** Store clock, so the shelve countdown ticks without its own timer. */
+  now: number;
   filters: AlarmFilters;
   collapsed: boolean;
   height: number;
@@ -33,6 +43,10 @@ interface Props {
 
 export const AlarmConsole = memo(function AlarmConsole({
   groups,
+  events,
+  tab,
+  onTab,
+  now,
   filters,
   collapsed,
   height,
@@ -149,12 +163,36 @@ export const AlarmConsole = memo(function AlarmConsole({
           className="console-toggle"
           onClick={onToggleCollapsed}
           aria-expanded={!collapsed}
+          aria-label={collapsed ? 'Expand alarm console' : 'Collapse alarm console'}
         >
           <span className="console-chevron" aria-hidden="true">
             {collapsed ? '▲' : '▼'}
           </span>
-          Alarms
         </button>
+
+        {!collapsed && (
+          <div className="console-tabs" role="tablist" aria-label="Alarm views">
+            <button
+              type="button"
+              className="console-tab"
+              role="tab"
+              aria-selected={tab === 'active'}
+              onClick={() => onTab('active')}
+            >
+              Active
+            </button>
+            <button
+              type="button"
+              className="console-tab"
+              role="tab"
+              aria-selected={tab === 'history'}
+              onClick={() => onTab('history')}
+            >
+              History
+            </button>
+          </div>
+        )}
+        {collapsed && <span className="console-toggle-label">Alarms</span>}
 
         {/* Counts stay visible when collapsed — this is the at-a-glance signal. */}
         <div className="console-counts">
@@ -230,7 +268,9 @@ export const AlarmConsole = memo(function AlarmConsole({
             if (!e.currentTarget.contains(e.relatedTarget as Node | null)) thaw();
           }}
         >
-          {ordered.length === 0 ? (
+          {tab === 'history' ? (
+            <EventLog events={events} />
+          ) : ordered.length === 0 ? (
             <p className="console-empty">
               {groups.length === 0 ? 'No active alarms.' : 'No alarms match the current filters.'}
             </p>
@@ -240,6 +280,7 @@ export const AlarmConsole = memo(function AlarmConsole({
                 <AlarmRow
                   key={g.id}
                   group={g}
+                  now={now}
                   onAck={onAck}
                   onShelve={onShelve}
                   onUnshelve={onUnshelve}
@@ -264,12 +305,14 @@ function Count({ severity, n }: { severity: Severity; n: number }) {
 
 const AlarmRow = memo(function AlarmRow({
   group,
+  now,
   onAck,
   onShelve,
   onUnshelve,
   onFocusAsset,
 }: {
   group: AlarmGroup;
+  now: number;
   onAck: (g: AlarmGroup) => void;
   onShelve: (g: AlarmGroup) => void;
   onUnshelve: (g: AlarmGroup) => void;
@@ -304,7 +347,16 @@ const AlarmRow = memo(function AlarmRow({
         </span>
       )}
 
-      <span className="alarm-msg">{group.message}</span>
+      {/* title gives the full text an escape hatch: the row truncates with an ellipsis. */}
+      <span className="alarm-msg" title={group.message}>
+        {group.message}
+      </span>
+
+      {group.shelved && group.shelvedUntil !== null && (
+        <span className="alarm-shelf-timer" title="Shelve expires automatically">
+          {fmtCountdown(group.shelvedUntil - now)}
+        </span>
+      )}
 
       <span className="alarm-severity">{group.severity}</span>
 

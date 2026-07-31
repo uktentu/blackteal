@@ -1,0 +1,118 @@
+.events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.event {
+  display: flex;
+  align-items: center;
+  gap: var(--bt-3);
+  height: 28px;
+  padding: 0 var(--bt-4) 0 var(--bt-3);
+  border-bottom: 1px solid var(--bt-rule);
+  border-left: 2px solid transparent;
+  font-size: 12px;
+}
+
+.event-time {
+  font-size: 11px;
+  color: var(--bt-text-faint);
+  flex: none;
+  width: 62px;
+}
+
+/* The transition is the point of this row, so it gets the strongest treatment here. */
+.event-kind {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  flex: none;
+  width: 86px;
+  color: var(--bt-text-muted);
+}
+
+.event[data-kind='raised'][data-severity='critical'] {
+  border-left-color: var(--bt-fault);
+}
+.event[data-kind='raised'][data-severity='critical'] .event-kind {
+  color: var(--bt-fault);
+}
+.event[data-kind='raised'][data-severity='warning'] {
+  border-left-color: var(--bt-warning);
+}
+.event[data-kind='raised'][data-severity='warning'] .event-kind {
+  color: var(--bt-warning);
+}
+
+/* Cleared is good news, so it stays quiet — the log is scanned for problems, not resolutions. */
+.event[data-kind='cleared'] .event-kind,
+.event[data-kind='acknowledged'] .event-kind,
+.event[data-kind='shelved'] .event-kind,
+.event[data-kind='unshelved'] .event-kind {
+  color: var(--bt-text-faint);
+}
+
+.event-asset {
+  font-size: 11px;
+  width: 78px;
+  flex: none;
+  color: var(--bt-text);
+}
+
+.event-code {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--bt-text-muted);
+  width: 120px;
+  flex: none;
+}
+
+.event-msg {
+  color: var(--bt-text-muted);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- tabs ---- */
+
+.console-tabs {
+  display: flex;
+  gap: var(--bt-1);
+}
+
+.console-tab {
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px var(--bt-2);
+  min-height: 28px;
+  color: var(--bt-text-faint);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.console-tab[aria-selected='true'] {
+  color: var(--bt-text);
+  border-bottom-color: var(--bt-accent);
+}
+
+.console-tab:hover {
+  color: var(--bt-text);
+}
+
+/* Shelve countdown — informational, quiet tier. */
+.alarm-shelf-timer {
+  font-family: var(--bt-mono);
+  font-size: 10px;
+  color: var(--bt-text-faint);
+  flex: none;
+}

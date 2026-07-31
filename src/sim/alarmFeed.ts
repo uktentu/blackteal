@@ -13,6 +13,8 @@ export interface AlarmEntry {
   alarm: Alarm;
   acknowledged: boolean;
   shelved: boolean;
+  /** Wall-clock ms at which this shelve expires; null when not shelved. */
+  shelvedUntil: number | null;
 }
 
 export interface AlarmGroup {
@@ -31,11 +33,14 @@ export interface AlarmGroup {
   /** A group is acknowledged/shelved only when every member is. */
   acknowledged: boolean;
   shelved: boolean;
+  /** Soonest expiry among the group's members, for the countdown. */
+  shelvedUntil: number | null;
 }
 
 export interface FeedOptions {
   acknowledged: Set<string>;
-  shelved: Set<string>;
+  /** key -> wall-clock ms at which the shelve expires. Shelving is always time-boxed. */
+  shelvedUntil: Map<string, number>;
   filters: { assetId: string | null; severity: Severity | null; showShelved: boolean };
 }
 
@@ -51,17 +56,19 @@ const key = (assetId: string, code: string) => `${assetId}:${code}`;
 export const FLOOD_THRESHOLD = 3;
 
 export function groupAlarms(site: SiteState, opts: FeedOptions): AlarmGroup[] {
-  const { acknowledged, shelved, filters } = opts;
+  const { acknowledged, shelvedUntil, filters } = opts;
 
   // --- flatten ---
   const entries: AlarmEntry[] = [];
   for (const [assetId, asset] of Object.entries(site.assets)) {
     for (const alarm of asset.alarms) {
+      const until = shelvedUntil.get(key(assetId, alarm.code)) ?? null;
       entries.push({
         assetId,
         alarm,
         acknowledged: acknowledged.has(key(assetId, alarm.code)),
-        shelved: shelved.has(key(assetId, alarm.code)),
+        shelved: until !== null,
+        shelvedUntil: until,
       });
     }
   }
@@ -101,6 +108,7 @@ export function groupAlarms(site: SiteState, opts: FeedOptions): AlarmGroup[] {
         // A group only counts as handled when every member is.
         acknowledged: list.every((e) => e.acknowledged),
         shelved: list.every((e) => e.shelved),
+        shelvedUntil: soonestExpiry(list),
       });
       continue;
     }
@@ -117,6 +125,7 @@ export function groupAlarms(site: SiteState, opts: FeedOptions): AlarmGroup[] {
         message: e.alarm.message,
         acknowledged: e.acknowledged,
         shelved: e.shelved,
+        shelvedUntil: e.shelvedUntil,
       });
     }
   }
@@ -132,6 +141,12 @@ export function groupAlarms(site: SiteState, opts: FeedOptions): AlarmGroup[] {
       b.count - a.count ||
       a.id.localeCompare(b.id),
   );
+}
+
+/** Soonest expiry in a group, so the countdown shows when the first member wakes up. */
+function soonestExpiry(list: AlarmEntry[]): number | null {
+  const times = list.map((e) => e.shelvedUntil).filter((t): t is number => t !== null);
+  return times.length === 0 ? null : Math.min(...times);
 }
 
 /** Header counts. Shelved alarms are excluded — that is what shelving means. */

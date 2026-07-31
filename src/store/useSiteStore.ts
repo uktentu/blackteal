@@ -1,8 +1,9 @@
 /**
  * Application state. One simulation tick produces exactly ONE store update.
  *
- * The store owns three things the pure simulator deliberately does not: which asset is
- * selected, operator actions on alarms (ack/shelve), and feed liveness as observed by the UI.
+ * The store owns four things the pure simulator deliberately does not: which asset is
+ * selected, operator actions on alarms (ack/shelve), feed liveness as observed by the UI, and
+ * the alarm event log.
  */
 
 import { create } from 'zustand';
@@ -11,9 +12,19 @@ import type { Alarm, Severity, SiteState } from '../domain/types';
 import { simulateFrame, siteSummary, TICK_MS } from '../sim/simulate';
 import { initialControl, type SimControl, type TriggerKind } from '../sim/scenarios';
 import { groupAlarms, type AlarmGroup } from '../sim/alarmFeed';
+import { appendEvents, diffAlarms, type AlarmEvent } from '../sim/alarmHistory';
 
 /** Ring buffer length for detail-panel sparklines (Stage 3). */
 const HISTORY = 60;
+
+/**
+ * How long a shelve lasts before it expires by itself.
+ *
+ * Real alarm shelving is always time-boxed (ISA-18.2). An indefinite shelve is how an alarm
+ * gets permanently lost — someone silences it during maintenance, forgets, and nobody sees it
+ * again. Short here so the behaviour is demonstrable in a review rather than theoretical.
+ */
+export const SHELVE_DURATION_MS = 60_000;
 
 export interface AlarmFilters {
   assetId: string | null;
@@ -27,6 +38,8 @@ interface SiteStore {
   tick: number;
   /** Wall-clock ms of the last accepted frame. Drives the stale indicator. */
   lastFrameAt: number;
+  /** Wall-clock ms, updated each tick — the header clock reads this, not Date.now() at render. */
+  now: number;
   /** True when the feed has stopped or the simulator flagged a dropout. */
   stale: boolean;
   running: boolean;
@@ -36,10 +49,13 @@ interface SiteStore {
 
   /** key = `${assetId}:${code}` */
   acknowledged: Set<string>;
-  shelved: Set<string>;
+  /** key -> wall-clock ms at which the shelve expires. */
+  shelvedUntil: Map<string, number>;
 
   /** Per-asset metric history for sparklines. */
   history: Record<string, number[]>;
+  /** Alarm event log — raised/cleared/acked/shelved, bounded ring buffer. */
+  events: AlarmEvent[];
 
   tickOnce: () => void;
   start: () => void;
@@ -61,6 +77,7 @@ export const alarmKey = (assetId: string, code: string) => `${assetId}:${code}`;
 const control: SimControl = initialControl();
 let timer: ReturnType<typeof setInterval> | null = null;
 let seed = 0x9e3779b9;
+let seq = 0;
 
 /** Key metric per asset type, sampled each tick for the sparkline. */
 function sampleMetric(site: SiteState, id: string): number | null {
@@ -70,10 +87,23 @@ function sampleMetric(site: SiteState, id: string): number | null {
   return null;
 }
 
+function logEvent(
+  events: AlarmEvent[],
+  at: number,
+  kind: AlarmEvent['kind'],
+  assetId: string,
+  alarm: Alarm,
+): AlarmEvent[] {
+  return appendEvents(events, [
+    { seq: seq++, at, kind, assetId, code: alarm.code, severity: alarm.severity, message: alarm.message },
+  ]);
+}
+
 export const useSiteStore = create<SiteStore>((set, get) => ({
   site: INITIAL_SNAPSHOT,
   tick: 0,
   lastFrameAt: Date.now(),
+  now: Date.now(),
   stale: false,
   running: false,
 
@@ -81,8 +111,9 @@ export const useSiteStore = create<SiteStore>((set, get) => ({
   filters: { assetId: null, severity: null, showShelved: true },
 
   acknowledged: new Set(),
-  shelved: new Set(),
+  shelvedUntil: new Map(),
   history: {},
+  events: [],
 
   tickOnce: () => {
     const prev = get();
@@ -90,6 +121,7 @@ export const useSiteStore = create<SiteStore>((set, get) => ({
     seed = (seed * 1664525 + 1013904223) >>> 0;
 
     const site = simulateFrame(prev.site, control, seed);
+    const at = Date.now();
 
     // Sample history in the same pass, so one tick is still one update.
     const history = { ...prev.history };
@@ -100,26 +132,41 @@ export const useSiteStore = create<SiteStore>((set, get) => ({
       history[id] = series.length >= HISTORY ? [...series.slice(1), v] : [...series, v];
     }
 
+    // Raised/cleared transitions — the trace a self-clearing alarm would otherwise not leave.
+    const diffs = diffAlarms(prev.site, site, at, seq);
+    seq += diffs.length;
+    const events = appendEvents(prev.events, diffs);
+
     /**
      * Acknowledgements are cleared when the underlying alarm clears, so the same condition
-     * recurring re-demands attention. Shelving is an explicit operator decision and survives.
+     * recurring re-demands attention. Shelves expire on their own timer.
      */
     const live = new Set(
       Object.entries(site.assets).flatMap(([id, a]) => a.alarms.map((x) => alarmKey(id, x.code))),
     );
     const acknowledged = new Set([...prev.acknowledged].filter((k) => live.has(k)));
 
+    let shelvedUntil = prev.shelvedUntil;
+    const expired = [...prev.shelvedUntil].filter(([, until]) => until <= at);
+    if (expired.length > 0) {
+      shelvedUntil = new Map(prev.shelvedUntil);
+      for (const [k] of expired) shelvedUntil.delete(k);
+    }
+
     set({
       site,
       history,
+      events,
       acknowledged,
+      shelvedUntil,
       tick: prev.tick + 1,
+      now: at,
       /**
        * Frozen while the feed is down, so "last frame Ns ago" actually ages. Refreshing it
        * every tick would report a disconnected feed as 0s old — the precise flavour of
        * presenting stale data as live that the brief warns against.
        */
-      lastFrameAt: site.stale ? prev.lastFrameAt : Date.now(),
+      lastFrameAt: site.stale ? prev.lastFrameAt : at,
       stale: site.stale,
     });
   },
@@ -154,16 +201,23 @@ export const useSiteStore = create<SiteStore>((set, get) => ({
   },
 
   acknowledge: (assetId, alarm) =>
-    set((s) => ({ acknowledged: new Set(s.acknowledged).add(alarmKey(assetId, alarm.code)) })),
+    set((s) => ({
+      acknowledged: new Set(s.acknowledged).add(alarmKey(assetId, alarm.code)),
+      events: logEvent(s.events, Date.now(), 'acknowledged', assetId, alarm),
+    })),
 
   shelve: (assetId, alarm) =>
-    set((s) => ({ shelved: new Set(s.shelved).add(alarmKey(assetId, alarm.code)) })),
+    set((s) => {
+      const next = new Map(s.shelvedUntil);
+      next.set(alarmKey(assetId, alarm.code), Date.now() + SHELVE_DURATION_MS);
+      return { shelvedUntil: next, events: logEvent(s.events, Date.now(), 'shelved', assetId, alarm) };
+    }),
 
   unshelve: (assetId, alarm) =>
     set((s) => {
-      const next = new Set(s.shelved);
+      const next = new Map(s.shelvedUntil);
       next.delete(alarmKey(assetId, alarm.code));
-      return { shelved: next };
+      return { shelvedUntil: next, events: logEvent(s.events, Date.now(), 'unshelved', assetId, alarm) };
     }),
 
   setFilters: (patch) => set((s) => ({ filters: { ...s.filters, ...patch } })),
@@ -179,15 +233,15 @@ export const useSiteStore = create<SiteStore>((set, get) => ({
  * Both build a fresh object graph on every call. Passing them to `useSiteStore(...)` would
  * hand useSyncExternalStore a new snapshot reference each render, which zustand v5 treats as
  * a changed store — an infinite re-render loop. Components subscribe to the stable slices
- * (`site`, `filters`, `acknowledged`, `shelved`) and memoize these against them instead.
+ * (`site`, `filters`, `acknowledged`, `shelvedUntil`) and memoize these against them instead.
  */
 export const buildSummary = siteSummary;
 
 export function buildAlarmGroups(
   site: SiteState,
   acknowledged: Set<string>,
-  shelved: Set<string>,
+  shelvedUntil: Map<string, number>,
   filters: AlarmFilters,
 ): AlarmGroup[] {
-  return groupAlarms(site, { acknowledged, shelved, filters });
+  return groupAlarms(site, { acknowledged, shelvedUntil, filters });
 }

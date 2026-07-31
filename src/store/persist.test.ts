@@ -5,7 +5,7 @@
  * localStorage is user-writable and outlives deploys, so every field is validated on read.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import {
   loadLayout,
   saveLayout,
@@ -16,6 +16,10 @@ import {
 } from './persist';
 
 const KEY = 'blackteal.layout.v1';
+
+// These tests replace the global `window`; restore it so the stub cannot leak into any
+// component test that shares this worker.
+afterEach(() => vi.unstubAllGlobals());
 
 function stubStorage() {
   const map = new Map<string, string>();

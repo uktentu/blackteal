@@ -16,7 +16,7 @@ npm run dev          # http://localhost:5173
 ```
 
 ```bash
-npm test             # 78 tests over the simulator, rule engine and alarm feed
+npm test             # 127 tests: pure logic + component/interaction tests
 npm run build        # typecheck + production build to dist/
 npm run check        # typecheck + lint + tests
 ```
@@ -77,6 +77,24 @@ from jitter alone, which is exactly the noise Stage 1 exists to eliminate.
 the underlying metric across its threshold and lets the rules fire. A hand-injected alarm would
 have no telemetry behind it, so the panel would show an alarm whose metrics look fine.
 
+## Built for operators, not just for the brief
+
+Beyond what the exercise asks for, because the exercise describes a screen someone watches for
+a whole shift:
+
+- **Alarm event log.** An active-alarms-only view loses any alarm that fires and self-clears
+  between two glances. Every raise, clear, ack and shelve is timestamped and kept (bounded ring
+  buffer), site-wide under the History tab and per-asset in the drawer.
+- **Time-boxed shelving.** Shelves expire automatically and show a live countdown. An
+  indefinite shelve is how an alarm gets permanently lost.
+- **Error boundaries.** A render exception shows an explicit "do not treat this as live" panel
+  instead of a white page — at the root and around each surface, so one failed panel doesn't
+  take the dashboard with it.
+- **Alarm rows never reorder under the pointer.** See Scaling notes below.
+- **Screen-reader announcements** for newly raised alarms, via an assertive live region.
+- **Focus moves into the drawer** when it opens and returns when it closes.
+- **Wall clock** in the header, and every event carries a timestamp.
+
 ## Design notes (Stage 2)
 
 The palette was verified numerically rather than eyeballed — the script that checks it lives in
@@ -129,10 +147,11 @@ click-to-open: capturing the pointer on the SVG root retargets the click away fr
 **History is in-memory only**, 60 samples per asset for the sparklines. Nothing persists across
 a reload. A real deployment reads a historian.
 
-**No E2E test suite.** The graded logic — simulator, rules, alarm feed — is pure and covered by
-78 unit tests. UI behaviour I verified by driving a headless browser and inspecting screenshots
-rather than by writing Playwright specs, which would have been the better long-term investment
-if this were going to keep growing.
+**Component tests instead of full E2E.** 127 tests: the pure logic (simulator, rules, alarm
+feed, event log) plus 26 component tests driving the real DOM via Testing Library — click an
+asset opens its panel, a missing metric renders a dash, a flood groups, Escape closes. These
+exist because a zoom feature once broke click-to-open while every logic test stayed green.
+Playwright against the built bundle would still be the right next layer.
 
 **What I'd build next, in order:** time-boxed shelving with a countdown; grouping by *time
 window* as well as code; an alarm history/event log (currently only active alarms are visible,

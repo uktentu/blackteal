@@ -9,7 +9,7 @@
 import { memo } from 'react';
 import type { AssetState } from '../domain/types';
 import { StatusIndicator } from './StatusIndicator';
-import { fmt, fmtAgo } from './format';
+import { fmt, fmtAgo, fmtClock } from './format';
 import './topstrip.css';
 
 interface Props {
@@ -20,6 +20,8 @@ interface Props {
   worst: AssetState;
   stale: boolean;
   staleForMs: number;
+  /** Store clock — control rooms always show wall-clock time. */
+  now: number;
   onSimulateBurst: () => void;
   onSimulateDropout: () => void;
 }
@@ -32,6 +34,7 @@ export const TopStrip = memo(function TopStrip({
   worst,
   stale,
   staleForMs,
+  now,
   onSimulateBurst,
   onSimulateDropout,
 }: Props) {
@@ -40,6 +43,12 @@ export const TopStrip = memo(function TopStrip({
       <div className="topstrip-brand">
         <span className="topstrip-site">HARBOR POINT BESS</span>
         <span className="topstrip-sub">15 MW / 60 MWh · 138 kV</span>
+      </div>
+
+      {/* Wall clock. "When did this start?" is unanswerable without one on screen. */}
+      <div className="topstrip-clock">
+        <span className="balance-label">Site time</span>
+        <span className="topstrip-time metric">{fmtClock(now)}</span>
       </div>
 
       {/* Power balance: grid + BESS = load. Reads as an equation on purpose. */}

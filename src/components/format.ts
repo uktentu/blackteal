@@ -55,6 +55,19 @@ export function fmtAgo(ms: number): string {
   return `${m}m ${s % 60}s ago`;
 }
 
+/** Wall-clock HH:MM:SS — control rooms always show the time. */
+export function fmtClock(ms: number): string {
+  const d = new Date(ms);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+/** Countdown as m:ss, for a time-boxed shelve. */
+export function fmtCountdown(ms: number): string {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
 export const STATE_LABEL = {
   NORMAL: 'Normal',
   WARNING: 'Warning',
