@@ -9,9 +9,13 @@
  */
 
 import { memo } from 'react';
-import { NAMEPLATE } from '../domain/topology';
+import { NAMEPLATE, assetKind } from '../domain/topology';
 import type { Alarm, Asset, SkidAsset, SubstationAsset, LoadAsset } from '../domain/types';
 import { StatusIndicator } from './StatusIndicator';
+import { Sparkline } from './Sparkline';
+import { Headroom } from './Headroom';
+import { derateCause, headroom } from '../sim/rules';
+import { explainAsset } from '../sim/explain';
 import { fmt, fmtAgo, fmtInt, NO_DATA, powerDirection, gridDirection } from './format';
 import './drawer.css';
 
@@ -19,6 +23,8 @@ interface Props {
   assetId: string | null;
   label: string;
   asset: Asset | null;
+  /** Recent samples of this asset's key metric, for the Stage 3 sparkline. */
+  history: number[];
   stale: boolean;
   lastFrameAt: number;
   onClose: () => void;
@@ -28,6 +34,7 @@ export const DetailDrawer = memo(function DetailDrawer({
   assetId,
   label,
   asset,
+  history,
   stale,
   lastFrameAt,
   onClose,
@@ -55,9 +62,13 @@ export const DetailDrawer = memo(function DetailDrawer({
           </header>
 
           <div className="drawer-scroll">
+            {/* Stage 4: the plain-language line comes first — it is the answer to "what is
+                wrong here", which is why the operator opened this panel. */}
+            <Explanation label={label} asset={asset} />
             <ConnectionHealth asset={asset} stale={stale} lastFrameAt={lastFrameAt} />
+            <TrendSection asset={asset} history={history} />
             <AlarmSection alarms={asset.alarms} />
-            <Telemetry asset={asset} />
+            <Telemetry assetId={assetId} asset={asset} />
           </div>
 
           <footer className="drawer-foot">
@@ -68,6 +79,49 @@ export const DetailDrawer = memo(function DetailDrawer({
     </aside>
   );
 });
+
+/** Stage 4 — one plain-language line, rule-derived. Absent when the asset is healthy. */
+function Explanation({ label, asset }: { label: string; asset: Asset }) {
+  const text = explainAsset(label, asset);
+  if (text === null) return null;
+
+  return (
+    <section className="drawer-explain" data-state={asset.state}>
+      <p>{text}</p>
+    </section>
+  );
+}
+
+/** Stage 3 — sparkline of the key metric, plus headroom against the envelope for a skid. */
+function TrendSection({ asset, history }: { asset: Asset; history: number[] }) {
+  const isSkid = 'pcs' in asset;
+  const skid = isSkid ? (asset as SkidAsset) : null;
+  const h = skid ? headroom(skid.battery, NAMEPLATE.pcs_kW) : null;
+  const cause = skid ? derateCause(skid.alarms) : null;
+
+  const tone = asset.state === 'FAULT' ? 'fault' : asset.state === 'WARNING' ? 'warning' : 'normal';
+
+  return (
+    <section className="drawer-section">
+      <h3 className="label">{isSkid ? 'Output — last 60 s' : 'Power — last 60 s'}</h3>
+      <Sparkline values={history} tone={tone} />
+
+      {h !== null && (
+        <>
+          <h3 className="label drawer-subhead">Headroom vs. operating envelope</h3>
+          <Headroom
+            nameplate_kW={NAMEPLATE.pcs_kW}
+            envelope_kW={h.envelope_kW}
+            output_kW={h.output_kW}
+            derate_kW={h.derate_kW}
+            headroom_kW={h.headroom_kW}
+            reason={h.isDerated && cause !== null ? cause.message : null}
+          />
+        </>
+      )}
+    </section>
+  );
+}
 
 /**
  * Connection health (checklist A8).
@@ -139,10 +193,16 @@ function AlarmSection({ alarms }: { alarms: Alarm[] }) {
   );
 }
 
-function Telemetry({ asset }: { asset: Asset }) {
-  if ('pcs' in asset) return <SkidTelemetry skid={asset as SkidAsset} />;
-  if ('metrics' in asset && 'pue' in asset.metrics) return <LoadTelemetry load={asset as LoadAsset} />;
-  return <SubstationTelemetry sub={asset as SubstationAsset} />;
+function Telemetry({ assetId, asset }: { assetId: string; asset: Asset }) {
+  // Discriminate on the topology, not on which optional fields happen to be present.
+  switch (assetKind(assetId)) {
+    case 'skid':
+      return <SkidTelemetry skid={asset as SkidAsset} />;
+    case 'load':
+      return <LoadTelemetry load={asset as LoadAsset} />;
+    default:
+      return <SubstationTelemetry sub={asset as SubstationAsset} />;
+  }
 }
 
 function SkidTelemetry({ skid }: { skid: SkidAsset }) {

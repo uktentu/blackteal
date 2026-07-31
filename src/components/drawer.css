@@ -242,3 +242,41 @@
 .drawer-note[data-tone='warning'] {
   color: var(--bt-warning);
 }
+
+/**
+ * Stage 4 explanation. A left rule in the state's tone, not a filled callout — a tinted
+ * block here would be the largest colored area on screen for a single sentence.
+ */
+.drawer-explain {
+  padding: var(--bt-3) var(--bt-4);
+  border-bottom: 1px solid var(--bt-rule);
+  border-left: 2px solid var(--bt-rule-strong);
+}
+
+.drawer-explain p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--bt-text);
+  max-width: none;
+}
+
+.drawer-explain[data-state='WARNING'] {
+  border-left-color: var(--bt-warning);
+}
+
+.drawer-explain[data-state='FAULT'] {
+  border-left-color: var(--bt-fault);
+}
+
+.drawer-explain[data-state='OFFLINE'] {
+  border-left-color: var(--bt-offline);
+}
+
+.drawer-explain[data-state='OFFLINE'] p {
+  color: var(--bt-text-muted);
+}
+
+.drawer-subhead {
+  margin-top: var(--bt-4) !important;
+}

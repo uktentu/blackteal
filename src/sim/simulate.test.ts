@@ -319,3 +319,40 @@ describe('site summary', () => {
     expect(next.assets).not.toBe(INITIAL_SNAPSHOT.assets);
   });
 });
+
+describe('operating envelope is enforced, not advisory', () => {
+  it('never lets a skid deliver more than its envelope allows', () => {
+    // Run past the burst, which derates several skids to 1400 kW.
+    const { frames } = run(TIMELINE.burst_s + 14);
+
+    for (const f of frames.slice(-6)) {
+      for (const id of SKID_IDS) {
+        const sk = skid(f, id);
+        const limit = sk.battery?.envelope?.max_discharge_kW;
+        if (sk.pcs?.power_kW == null || limit == null) continue;
+        // Small tolerance for the ramp-down still settling.
+        expect(Math.abs(sk.pcs.power_kW)).toBeLessThanOrEqual(limit + 1);
+      }
+    }
+  });
+
+  it('keeps headroom non-negative once the clamp has settled', () => {
+    const { frames } = run(TIMELINE.burst_s + 14);
+    const settled = frames[frames.length - 1];
+
+    for (const id of SKID_IDS) {
+      const h = headroom(skid(settled, id).battery, NAMEPLATE.pcs_kW);
+      if (h === null) continue;
+      expect(h.headroom_kW).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('still balances power after clamping', () => {
+    const { frames } = run(TIMELINE.burst_s + 14);
+    const f = frames[frames.length - 1];
+    const discharge =
+      -SKID_IDS.map((id) => skid(f, id).pcs?.power_kW ?? 0).reduce((a, b) => a + b, 0) / 1000;
+    const residual = (load(f).metrics.power_MW ?? 0) - discharge - (sub(f).metrics.power_MW ?? 0);
+    expect(Math.abs(residual)).toBeLessThan(0.5);
+  });
+});

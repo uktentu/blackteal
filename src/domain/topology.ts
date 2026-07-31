@@ -1,6 +1,6 @@
 /** Site topology — transcribed verbatim from docs/BRIEF.md §2. */
 
-import type { Topology } from './types';
+import type { AssetType, Topology } from './types';
 
 export const TOPOLOGY: Topology = {
   assets: [
@@ -30,6 +30,21 @@ export const TOPOLOGY: Topology = {
 };
 
 export const SKID_IDS = TOPOLOGY.assets.filter((a) => a.type === 'skid').map((a) => a.id);
+
+const KIND_BY_ID: Record<string, AssetType> = Object.fromEntries(
+  TOPOLOGY.assets.map((a) => [a.id, a.type]),
+);
+
+/**
+ * The asset's kind, from the topology.
+ *
+ * Needed because SubstationMetrics and LoadMetrics have entirely optional fields, which makes
+ * them mutually assignable — so `'pue' in metrics` neither narrows at compile time nor is
+ * safe to rely on at runtime. The topology already knows the answer; ask it.
+ */
+export function assetKind(id: string): AssetType | undefined {
+  return KIND_BY_ID[id];
+}
 
 /** Nameplate ratings — docs/BRIEF.md §3. */
 export const NAMEPLATE = {

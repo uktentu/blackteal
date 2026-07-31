@@ -193,11 +193,63 @@ export function simulateFrame(prev: SiteState, ctl: SimControl, seed: number): S
   // --- 2. scenarios ---
   const scripted = applyScenarios({ ...prev, assets }, ctl);
 
-  // --- 3. re-solve the power balance ---
-  const balanced = solveBalance(scripted);
+  // --- 3. hold each skid inside its operating envelope ---
+  const limited = enforceEnvelope(scripted);
 
-  // --- 4. re-derive state and alarms ---
+  // --- 4. re-solve the power balance ---
+  const balanced = solveBalance(limited);
+
+  // --- 5. re-derive state and alarms ---
   return evaluateFrame(balanced);
+}
+
+/**
+ * Clamp each skid's output to what its battery currently allows.
+ *
+ * The envelope is not advisory — a real PCS backs off to stay inside it. Letting a skid keep
+ * delivering 2.1 MW while its envelope reads 1.4 MW puts two contradictory numbers side by
+ * side in the detail panel and makes "headroom" nonsense (it would show negative margin).
+ *
+ * It also makes the derate legible on the diagram: the operator watches the skid actually
+ * reduce output, which is the behaviour the alarm is describing.
+ */
+export function enforceEnvelope(state: SiteState): SiteState {
+  const assets = { ...state.assets };
+
+  for (const id of SKID_IDS) {
+    const skid = assets[id] as SkidAsset;
+    const limit = skid.battery?.envelope?.max_discharge_kW;
+    if (skid.pcs?.power_kW == null || skid.battery == null || limit == null) continue;
+
+    const output = Math.abs(skid.pcs.power_kW);
+    if (output <= limit) continue;
+
+    // Ramp down rather than snapping: a 700 kW step in one tick reads as a glitch.
+    const target = -limit;
+    const power_kW = Math.round(Math.max(target, skid.pcs.power_kW + (target - skid.pcs.power_kW) * 0.25));
+    const dc = skid.battery.dc_bus_V ?? NAMEPLATE.battery_nominal_V;
+    const battery_kW = Math.round(power_kW / 0.981);
+
+    assets[id] = {
+      ...skid,
+      pcs: {
+        ...skid.pcs,
+        power_kW,
+        ac_current_A:
+          skid.pcs.ac_current_A == null || skid.pcs.ac_voltage_V == null
+            ? skid.pcs.ac_current_A
+            : Math.round((Math.abs(power_kW) * 1000) / (skid.pcs.ac_voltage_V * Math.sqrt(3))),
+      },
+      battery: {
+        ...skid.battery,
+        power_kW: battery_kW,
+        current_A: Math.round((Math.abs(battery_kW) * 1000) / dc),
+        c_rate: round(Math.abs(battery_kW) / NAMEPLATE.battery_kWh, 2),
+      },
+    };
+  }
+
+  return { ...state, assets };
 }
 
 /**

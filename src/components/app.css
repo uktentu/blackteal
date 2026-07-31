@@ -33,3 +33,62 @@
     filter var(--bt-t-state) var(--bt-ease),
     opacity var(--bt-t-state) var(--bt-ease);
 }
+
+/* Diagram column: canvas takes the space, legend pinned beneath it. */
+.app-diagram {
+  display: flex;
+  flex-direction: column;
+  gap: var(--bt-3);
+}
+
+.app-canvas {
+  flex: 1;
+  min-height: 0;
+}
+
+/**
+ * Responsive. Below 1100px the drawer overlays the diagram rather than shrinking it —
+ * squeezing a single-line diagram past a certain width stops it being readable at all,
+ * and situational awareness is the thing that must survive.
+ */
+@media (max-width: 1100px) {
+  .drawer[data-open] {
+    position: fixed;
+    top: 52px;
+    right: 0;
+    bottom: 0;
+    z-index: 10;
+    width: min(360px, 92vw);
+    box-shadow: -8px 0 24px rgb(0 0 0 / 35%);
+  }
+}
+
+@media (max-width: 720px) {
+  .topstrip {
+    height: auto;
+    flex-wrap: wrap;
+    gap: var(--bt-3);
+    padding: var(--bt-2) var(--bt-3);
+  }
+
+  .topstrip-brand {
+    border-right: none;
+    padding-right: 0;
+  }
+
+  .topstrip-right {
+    margin-left: 0;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .console {
+    height: 34vh;
+  }
+
+  /* Drop the lowest-value columns first; asset, message and severity stay. */
+  .alarm-code,
+  .alarm-severity {
+    display: none;
+  }
+}

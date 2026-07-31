@@ -308,13 +308,49 @@ export function evaluateLoad(): Evaluation {
 // ---------------------------------------------------------------------------
 
 /**
- * The alarm responsible for a derated envelope: highest severity wins, then catalog rank.
+ * Which alarm a derate should be attributed to, most-root-cause first.
+ *
+ * Ordered by causation, NOT by severity or alphabetically. A hot module and a wide cell
+ * spread usually appear together and are both warnings, but the absolute temperature is the
+ * cause and the spread is its symptom — telling an operator "cell temperatures have drifted
+ * apart" when a module is sitting at 41 °C sends them after the wrong thing.
+ */
+const DERATE_PRIORITY: AlarmCode[] = [
+  // Critical causes first.
+  'TEMP_CRIT',
+  'INSULATION_CRIT',
+  'DC_OVERCURRENT',
+  'CELL_OV',
+  'CELL_UV',
+  // Then warnings, root cause before symptom.
+  'TEMP_HIGH',
+  'HVAC_FAULT',
+  'TEMP_DELTA',
+  'INSULATION_LOW',
+  'CELL_OV_WARN',
+  'CELL_UV_WARN',
+  'SOH_DEGRADED',
+  'SOC_LOW',
+];
+
+/**
+ * The alarm responsible for a derated envelope.
  * This is the payoff of keeping rules data-driven — no separate explanation table.
  */
 export function derateCause(alarms: Alarm[]): Alarm | null {
-  const thermal: AlarmCode[] = ['TEMP_CRIT', 'TEMP_HIGH', 'TEMP_DELTA', 'HVAC_FAULT'];
-  const ranked = sortAlarms(alarms).filter((a) => thermal.includes(a.code) || a.severity === 'critical');
-  return ranked[0] ?? null;
+  let best: Alarm | null = null;
+  let bestRank = Number.POSITIVE_INFINITY;
+
+  for (const alarm of alarms) {
+    const rank = DERATE_PRIORITY.indexOf(alarm.code);
+    if (rank === -1) continue;
+    if (rank < bestRank) {
+      bestRank = rank;
+      best = alarm;
+    }
+  }
+
+  return best;
 }
 
 /** Headroom against the operating envelope. Returns null when the inputs aren't available. */

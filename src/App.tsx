@@ -4,6 +4,7 @@ import { TOPOLOGY } from './domain/topology';
 import { Diagram } from './components/Diagram';
 import { TopStrip } from './components/TopStrip';
 import { DetailDrawer } from './components/DetailDrawer';
+import { Legend } from './components/Legend';
 import { AlarmConsole } from './components/AlarmConsole';
 import type { AlarmGroup } from './sim/alarmFeed';
 import './components/app.css';
@@ -18,6 +19,7 @@ export default function App() {
   const filters = useSiteStore((s) => s.filters);
   const acknowledged = useSiteStore((s) => s.acknowledged);
   const shelved = useSiteStore((s) => s.shelved);
+  const history = useSiteStore((s) => s.history);
 
   // Derived here, not in a store selector: both allocate a new object graph per call, which
   // zustand v5 would read as a changed snapshot on every render.
@@ -38,6 +40,19 @@ export default function App() {
   const unshelve = useSiteStore((s) => s.unshelve);
 
   const [collapsed, setCollapsed] = useState(false);
+  const [flashedId, setFlashedId] = useState<string | null>(null);
+
+  /**
+   * Jumping from an alarm row to its asset: select it AND flash it.
+   *
+   * Selection alone is not enough during a flood — the operator's eye is in the console, and
+   * a ring that quietly appears somewhere on the diagram is easy to miss.
+   */
+  const focusAsset = useCallback((assetId: string) => {
+    select(assetId);
+    setFlashedId(assetId);
+    window.setTimeout(() => setFlashedId((cur) => (cur === assetId ? null : cur)), 1900);
+  }, [select]);
 
   useEffect(() => {
     start();
@@ -101,13 +116,23 @@ export default function App() {
 
       <div className="app-body">
         <section className="app-diagram" aria-label="Site diagram">
-          <Diagram site={site} selectedId={selectedId} stale={stale} onSelect={select} />
+          <div className="app-canvas">
+            <Diagram
+              site={site}
+              selectedId={selectedId}
+              flashedId={flashedId}
+              stale={stale}
+              onSelect={select}
+            />
+          </div>
+          <Legend flowing={!stale} />
         </section>
 
         <DetailDrawer
           assetId={selectedId}
           label={selectedId === null ? '' : (LABELS[selectedId] ?? selectedId)}
           asset={selectedAsset}
+          history={selectedId === null ? [] : (history[selectedId] ?? [])}
           stale={stale}
           lastFrameAt={lastFrameAt}
           onClose={() => select(null)}
@@ -123,7 +148,7 @@ export default function App() {
         onAck={onAck}
         onShelve={onShelve}
         onUnshelve={onUnshelve}
-        onFocusAsset={select}
+        onFocusAsset={focusAsset}
       />
     </div>
   );

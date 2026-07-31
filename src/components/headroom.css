@@ -1,0 +1,88 @@
+.headroom-track {
+  position: relative;
+  height: 10px;
+  background: var(--bt-bg);
+  border: 1px solid var(--bt-rule);
+  border-radius: 1px;
+  overflow: hidden;
+  margin-bottom: var(--bt-3);
+}
+
+.headroom-track > span {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  /* Envelope changes are meaningful state changes, so they crossfade like one. */
+  transition: width var(--bt-t-state) var(--bt-ease), left var(--bt-t-state) var(--bt-ease);
+}
+
+/* Capacity the derate has taken away: hatched, not filled — it is absence, like offline. */
+.headroom-derated {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--bt-warning-dim) 0 3px,
+    transparent 3px 6px
+  );
+}
+
+.headroom-envelope {
+  background: var(--bt-rule-strong);
+}
+
+.headroom-output {
+  background: var(--bt-text-muted);
+}
+
+/* Where the envelope currently stops. */
+.headroom-tick {
+  width: 1px;
+  background: var(--bt-warning);
+}
+
+.headroom-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--bt-4);
+  margin: 0;
+}
+
+.headroom-item dt {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bt-text-muted);
+  margin-bottom: 1px;
+}
+
+.headroom-item dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--bt-text);
+}
+
+.headroom-item[data-tone='warning'] dd {
+  color: var(--bt-warning);
+}
+
+.headroom-item[data-tone='muted'] dd {
+  color: var(--bt-text-muted);
+}
+
+.headroom-unit {
+  font-family: var(--bt-sans);
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--bt-text-faint);
+  margin-left: 3px;
+}
+
+/* Stage 4's sentence, reused: the rule that fired is the reason. */
+.headroom-reason {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--bt-warning);
+  margin: var(--bt-3) 0 0;
+}

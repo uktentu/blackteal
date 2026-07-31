@@ -8,10 +8,18 @@
  * topology, and it explicitly says the art is not being evaluated.
  */
 
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { TOPOLOGY, NAMEPLATE } from '../domain/topology';
-import type { Asset, AssetState, SiteState, SkidAsset, TopologyAsset } from '../domain/types';
-import { fmt, fmtMW, NO_DATA, STATE_LABEL } from './format';
+import type {
+  Asset,
+  AssetState,
+  LoadAsset,
+  SiteState,
+  SkidAsset,
+  SubstationAsset,
+  TopologyAsset,
+} from '../domain/types';
+import { fmt, fmtMW, gridDirection, NO_DATA, powerDirection, STATE_LABEL } from './format';
 import './diagram.css';
 
 const NODE_W = 164;
@@ -55,12 +63,47 @@ function secondaryMetric(asset: Asset): string | null {
   return null;
 }
 
+/** 1-2 headline metrics for the hover tooltip — progressive disclosure before the drawer. */
+function tooltipLines(topo: TopologyAsset, asset: Asset): string[] {
+  if (topo.type === 'skid') {
+    const skid = asset as SkidAsset;
+    if (skid.pcs === null || skid.battery === null) return ['No telemetry — comms lost'];
+
+    const lines = [
+      `${fmtMW(skid.pcs.power_kW)} MW ${powerDirection(skid.pcs.power_kW) ?? ''}`.trim(),
+      `${fmt(skid.battery.soc_pct, 0)}% SoC · ${fmt(skid.battery.cell_temp_max_C, 1)} °C max cell`,
+    ];
+    const env = skid.battery.envelope?.max_discharge_kW;
+    if (env != null && env < NAMEPLATE.pcs_kW) {
+      lines.push(`Derated to ${fmtMW(env)} MW`);
+    }
+    return lines;
+  }
+
+  if (topo.type === 'load') {
+    const metrics = (asset as LoadAsset).metrics;
+    return [
+      `${fmt(metrics.power_MW, 1)} MW facility`,
+      `${fmt(metrics.it_load_MW, 1)} MW IT · PUE ${fmt(metrics.pue, 2)}`,
+    ];
+  }
+
+  const metrics = (asset as SubstationAsset).metrics;
+  return [
+    `${fmt(metrics.power_MW, 1)} MW ${gridDirection(metrics.power_MW) ?? ''}`.trim(),
+    `${fmt(metrics.voltage_kV, 1)} kV · ${fmt(metrics.frequency_Hz, 2)} Hz`,
+  ];
+}
+
 interface NodeProps {
   topo: TopologyAsset;
   asset: Asset;
   selected: boolean;
+  /** Briefly true after an alarm row jumps here, so the eye can find the node. */
+  flashed: boolean;
   stale: boolean;
   onSelect: (id: string) => void;
+  onHover: (id: string | null) => void;
 }
 
 /**
@@ -68,7 +111,7 @@ interface NodeProps {
  * (checklist I-perf) — the comparator below is what makes that real.
  */
 const AssetNode = memo(
-  function AssetNode({ topo, asset, selected, stale, onSelect }: NodeProps) {
+  function AssetNode({ topo, asset, selected, flashed, stale, onSelect, onHover }: NodeProps) {
     const { value, unit } = keyMetric(asset);
     const secondary = secondaryMetric(asset);
     const state: AssetState = asset.state;
@@ -80,9 +123,14 @@ const AssetNode = memo(
         className="node"
         data-state={state}
         data-selected={selected || undefined}
+        data-flashed={flashed || undefined}
         data-stale={stale || undefined}
         transform={`translate(${x} ${y})`}
         onClick={() => onSelect(topo.id)}
+        onMouseEnter={() => onHover(topo.id)}
+        onMouseLeave={() => onHover(null)}
+        onFocus={() => onHover(topo.id)}
+        onBlur={() => onHover(null)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
@@ -133,9 +181,41 @@ const AssetNode = memo(
   (a, b) =>
     a.asset === b.asset &&
     a.selected === b.selected &&
+    a.flashed === b.flashed &&
     a.stale === b.stale &&
     a.topo === b.topo,
 );
+
+/**
+ * Hover tooltip — progressive disclosure. One or two headline metrics so an operator can
+ * triage without committing to opening the drawer.
+ *
+ * Rendered as an SVG overlay in the diagram's own coordinate space, so it tracks the node
+ * under zoom without a second positioning system.
+ */
+const Tooltip = memo(function Tooltip({ topo, asset }: { topo: TopologyAsset; asset: Asset }) {
+  const lines = tooltipLines(topo, asset);
+  const w = 186;
+  const h = 20 + lines.length * 15;
+  // Flip above the node when it would otherwise run off the bottom edge.
+  const below = topo.y + NODE_H + h + 8 < VIEW_H;
+  const y = below ? topo.y + NODE_H + 8 : topo.y - h - 8;
+  const x = Math.min(topo.x, VIEW_W - w - 4);
+
+  return (
+    <g className="tip" transform={`translate(${x} ${y})`} pointerEvents="none">
+      <rect className="tip-body" width={w} height={h} rx={2} />
+      <text className="tip-title" x={10} y={16}>
+        {SHORT_LABEL[topo.id] ?? topo.label}
+      </text>
+      {lines.map((line, i) => (
+        <text key={line} className="tip-line metric" x={10} y={32 + i * 15}>
+          {line}
+        </text>
+      ))}
+    </g>
+  );
+});
 
 interface LinkProps {
   from: TopologyAsset;
@@ -162,17 +242,29 @@ const Link = memo(function Link({ from, to, flowMW, live }: LinkProps) {
   const magnitude = Math.min(3, 0.6 + Math.abs(flowMW) * 0.7);
   const flowing = live && Math.abs(flowMW) > 0.05;
 
+  // Arrowhead sits at the midpoint of the horizontal run, pointing the way power travels.
+  const headX = flowMW < 0 ? x1 + 14 : x2 - 14;
+  const dir = flowMW < 0 ? -1 : 1;
+
   return (
     <g className="link" data-flowing={flowing || undefined}>
       <path className="link-base" d={d} />
       {flowing && (
-        <path
-          className="link-flow"
-          d={d}
-          strokeWidth={magnitude}
-          // Negative flow reverses the dash march, so the arrows read the right way.
-          style={{ animationDirection: flowMW < 0 ? 'reverse' : 'normal' }}
-        />
+        <>
+          <path
+            className="link-flow"
+            d={d}
+            strokeWidth={magnitude}
+            // Negative flow reverses the dash march, so the motion reads the right way.
+            style={{ animationDirection: flowMW < 0 ? 'reverse' : 'normal' }}
+          />
+          {/* A static arrowhead as well as the moving dashes: direction is the whole point
+              of drawing flow, and it must survive prefers-reduced-motion. */}
+          <path
+            className="link-head"
+            d={`M${headX} ${y2 - 3} L${headX + 5 * dir} ${y2} L${headX} ${y2 + 3} Z`}
+          />
+        </>
       )}
     </g>
   );
@@ -181,11 +273,15 @@ const Link = memo(function Link({ from, to, flowMW, live }: LinkProps) {
 interface Props {
   site: SiteState;
   selectedId: string | null;
+  /** Asset that an alarm row just jumped to; flashes so the eye can find it. */
+  flashedId: string | null;
   stale: boolean;
   onSelect: (id: string) => void;
 }
 
-export function Diagram({ site, selectedId, stale, onSelect }: Props) {
+export function Diagram({ site, selectedId, flashedId, stale, onSelect }: Props) {
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+
   const byId = useMemo(
     () => Object.fromEntries(TOPOLOGY.assets.map((a) => [a.id, a])),
     [],
@@ -228,11 +324,18 @@ export function Diagram({ site, selectedId, stale, onSelect }: Props) {
             topo={topo}
             asset={site.assets[topo.id]}
             selected={selectedId === topo.id}
+            flashed={flashedId === topo.id}
             stale={stale}
             onSelect={onSelect}
+            onHover={setHoveredId}
           />
         ))}
       </g>
+
+      {/* Tooltip last, so it paints above every node. */}
+      {hoveredId !== null && hoveredId !== selectedId && (
+        <Tooltip topo={byId[hoveredId]} asset={site.assets[hoveredId]} />
+      )}
     </svg>
   );
 }

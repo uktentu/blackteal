@@ -195,3 +195,54 @@
 .node[data-stale] .node-metric {
   fill: var(--bt-text-faint);
 }
+
+/* ---- flow arrowhead ---- */
+
+.link-head {
+  fill: var(--bt-flow);
+  opacity: 0.85;
+}
+
+/* ---- hover tooltip: progressive disclosure before opening the drawer ---- */
+
+.tip-body {
+  fill: var(--bt-raised);
+  stroke: var(--bt-rule-strong);
+  stroke-width: 1;
+}
+
+.tip-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  fill: var(--bt-text-muted);
+}
+
+.tip-line {
+  font-size: 11px;
+  fill: var(--bt-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/**
+ * Focus flash: fires when an alarm row jumps to this asset.
+ *
+ * Uses the interaction accent, not a status color — it means "here is the thing you asked
+ * for", which is navigation, not a change in the plant.
+ */
+.node[data-flashed] .node-body {
+  stroke: var(--bt-accent);
+  stroke-width: 2;
+  animation: bt-flash 900ms var(--bt-ease) 2;
+}
+
+@keyframes bt-flash {
+  0%,
+  100% {
+    stroke-opacity: 1;
+  }
+  50% {
+    stroke-opacity: 0.25;
+  }
+}
