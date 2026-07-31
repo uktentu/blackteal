@@ -1,0 +1,82 @@
+/**
+ * Status rendering. Form carries as much of the meaning as color does.
+ * See .claude/references/design-system.md for the verified contrast and grayscale figures.
+ */
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--bt-2);
+  white-space: nowrap;
+}
+
+.status-mark {
+  display: inline-block;
+  flex: none;
+  border-radius: 50%;
+  /* Only the state transition crossfades. Metric values never animate. */
+  transition:
+    background-color var(--bt-t-state) var(--bt-ease),
+    border-color var(--bt-t-state) var(--bt-ease),
+    box-shadow var(--bt-t-state) var(--bt-ease);
+}
+
+.status-label {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--bt-text-muted);
+}
+
+/* NORMAL — gray, hollow, quiet. Six of these at once must not read as six signals. */
+.status[data-state='NORMAL'] .status-mark {
+  background: transparent;
+  border: 1.5px solid var(--bt-normal);
+}
+
+/* WARNING — muted amber, hollow ring. Static: no motion at this severity. */
+.status[data-state='WARNING'] .status-mark {
+  background: transparent;
+  border: 2px solid var(--bt-warning);
+}
+.status[data-state='WARNING'] .status-label {
+  color: var(--bt-warning);
+}
+
+/* FAULT — saturated red, FILLED, and the only thing on screen that moves. */
+.status[data-state='FAULT'] .status-mark {
+  background: var(--bt-fault);
+  border: 2px solid var(--bt-fault);
+  animation: bt-pulse 1.8s ease-in-out infinite;
+}
+.status[data-state='FAULT'] .status-label {
+  color: var(--bt-fault);
+}
+
+/* OFFLINE — dashed, not a fill. Absence of information, not a process state.
+   The label uses --bt-text-muted (6.3:1) so no meaning rests on the dim stroke. */
+.status[data-state='OFFLINE'] .status-mark {
+  background: transparent;
+  border: 1.5px dashed var(--bt-offline);
+}
+
+@keyframes bt-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(239 79 66 / 45%);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgb(239 79 66 / 0%);
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

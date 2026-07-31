@@ -1,0 +1,197 @@
+/**
+ * Diagram. Hairline rules and type do the structural work; there are no filled status cards.
+ */
+
+.diagram {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ---- connections ---- */
+
+.link-base {
+  fill: none;
+  stroke: var(--bt-rule);
+  stroke-width: 1;
+}
+
+.link-flow {
+  fill: none;
+  stroke: var(--bt-flow);
+  stroke-linecap: round;
+  stroke-dasharray: 2 7;
+  animation: bt-flow 1.4s linear infinite;
+  opacity: 0.75;
+}
+
+@keyframes bt-flow {
+  to {
+    stroke-dashoffset: -18;
+  }
+}
+
+/* ---- asset nodes ---- */
+
+.node {
+  cursor: pointer;
+}
+
+.node:focus {
+  outline: none;
+}
+
+.node-body {
+  fill: var(--bt-surface);
+  stroke: var(--bt-rule);
+  stroke-width: 1;
+  transition: fill var(--bt-t-state) var(--bt-ease), stroke var(--bt-t-state) var(--bt-ease);
+}
+
+.node:hover .node-body {
+  fill: var(--bt-raised);
+}
+
+.node:focus-visible .node-body {
+  stroke: var(--bt-accent);
+  stroke-width: 2;
+}
+
+/* 2px left rule carries status. Never a full fill. */
+.node-status-rule {
+  transition: fill var(--bt-t-state) var(--bt-ease);
+}
+
+.node-mark-shape {
+  transition: fill var(--bt-t-state) var(--bt-ease), stroke var(--bt-t-state) var(--bt-ease);
+}
+
+.node-label {
+  font-size: 11px;
+  font-weight: 500;
+  fill: var(--bt-text);
+}
+
+.node-metric {
+  font-size: 13px;
+  font-weight: 500;
+  fill: var(--bt-text);
+  /* Tabular figures: without these, every digit change shifts the layout on each tick. */
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+.node-unit,
+.node-secondary {
+  font-size: 10px;
+  font-weight: 400;
+  fill: var(--bt-text-muted);
+}
+
+.node-state {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  fill: var(--bt-text-muted);
+  transition: fill var(--bt-t-state) var(--bt-ease);
+}
+
+/* ---- per-state ---- */
+
+.node[data-state='NORMAL'] .node-status-rule {
+  fill: var(--bt-normal);
+}
+.node[data-state='NORMAL'] .node-mark-shape {
+  fill: none;
+  stroke: var(--bt-normal);
+  stroke-width: 1.5;
+}
+
+.node[data-state='WARNING'] .node-status-rule {
+  fill: var(--bt-warning);
+}
+.node[data-state='WARNING'] .node-mark-shape {
+  fill: none;
+  stroke: var(--bt-warning);
+  stroke-width: 2;
+}
+.node[data-state='WARNING'] .node-state {
+  fill: var(--bt-warning);
+}
+
+.node[data-state='FAULT'] .node-status-rule {
+  fill: var(--bt-fault);
+}
+.node[data-state='FAULT'] .node-mark-shape {
+  fill: var(--bt-fault);
+  stroke: var(--bt-fault);
+  stroke-width: 2;
+  transform-origin: center;
+  animation: bt-node-pulse 1.8s ease-in-out infinite;
+}
+.node[data-state='FAULT'] .node-state {
+  fill: var(--bt-fault);
+}
+
+/* Offline: dashed outline, no status color fill. Absence of data, not a process state. */
+.node[data-state='OFFLINE'] .node-body {
+  stroke: var(--bt-offline);
+  stroke-dasharray: 4 3;
+}
+.node[data-state='OFFLINE'] .node-status-rule {
+  fill: transparent;
+}
+.node[data-state='OFFLINE'] .node-mark-shape {
+  fill: none;
+  stroke: var(--bt-offline);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 2;
+}
+.node[data-state='OFFLINE'] .node-label,
+.node[data-state='OFFLINE'] .node-metric {
+  fill: var(--bt-text-faint);
+}
+
+@keyframes bt-node-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* ---- selection: persistent ring while the drawer is open ---- */
+
+.node[data-selected] .node-body {
+  stroke: var(--bt-accent);
+  stroke-width: 2;
+}
+
+/* ---- click-to-inspect affordance ---- */
+
+.node-plus {
+  opacity: 0;
+  transition: opacity var(--bt-t-state) var(--bt-ease);
+}
+.node-plus circle {
+  fill: var(--bt-accent);
+}
+.node-plus path {
+  stroke: #fff;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+.node:hover .node-plus,
+.node:focus-visible .node-plus,
+.node[data-selected] .node-plus {
+  opacity: 1;
+}
+
+/* ---- stale: the whole surface recedes, so nothing reads as live ---- */
+
+.node[data-stale] .node-metric {
+  fill: var(--bt-text-faint);
+}

@@ -1,0 +1,35 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100svh;
+  background: var(--bt-bg);
+}
+
+.app-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+/* Diagram is the dominant surface — situational awareness first. */
+.app-diagram {
+  flex: 1;
+  min-width: 0;
+  padding: var(--bt-4);
+  overflow: hidden;
+}
+
+/**
+ * Stale: the entire data surface desaturates and dims.
+ *
+ * This is deliberately heavy-handed. The brief's wording is "never present frozen values as
+ * live", and a small badge somewhere is easy to miss — an operator glancing at the screen has
+ * to register that nothing here can be trusted right now.
+ */
+.app[data-stale] .app-diagram {
+  filter: grayscale(0.8);
+  opacity: 0.55;
+  transition:
+    filter var(--bt-t-state) var(--bt-ease),
+    opacity var(--bt-t-state) var(--bt-ease);
+}

@@ -1,0 +1,162 @@
+.topstrip {
+  display: flex;
+  align-items: center;
+  gap: var(--bt-6);
+  padding: 0 var(--bt-4);
+  height: 52px;
+  flex: none;
+  border-bottom: 1px solid var(--bt-rule);
+  background: var(--bt-surface);
+}
+
+.topstrip-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-right: var(--bt-5);
+  border-right: 1px solid var(--bt-rule);
+}
+
+.topstrip-site {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  color: var(--bt-text);
+}
+
+.topstrip-sub {
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  color: var(--bt-text-faint);
+}
+
+/* ---- power balance ---- */
+
+.topstrip-balance {
+  display: flex;
+  align-items: baseline;
+  gap: var(--bt-3);
+}
+
+.topstrip-op {
+  font-size: 13px;
+  color: var(--bt-text-faint);
+}
+
+.balance {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.balance-label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--bt-text-muted);
+}
+
+.balance-value {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--bt-text-muted);
+  /* No transition here on purpose: metric numbers update instantly, every tick. */
+}
+
+.balance[data-emphasis] .balance-value {
+  color: var(--bt-text);
+}
+
+.balance-unit {
+  font-family: var(--bt-sans);
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--bt-text-faint);
+  margin-left: 3px;
+}
+
+/* ---- right cluster ---- */
+
+.topstrip-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--bt-4);
+}
+
+.topstrip-health {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--bt-2);
+}
+
+.topstrip-health-text {
+  font-size: 12px;
+  color: var(--bt-text-muted);
+}
+
+/* Stale is the loudest non-alarm element on screen: if the feed is dead, nothing else
+   on this page can be trusted, and the brief says never present frozen values as live. */
+.topstrip-stale {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--bt-2);
+  padding: 3px var(--bt-2);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--bt-fault);
+  border: 1px solid var(--bt-fault);
+  border-radius: 2px;
+}
+
+.topstrip-stale-mark {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--bt-fault);
+  animation: bt-blink 1.6s ease-in-out infinite;
+}
+
+@keyframes bt-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* ---- demo triggers ---- */
+
+.topstrip-actions {
+  display: flex;
+  gap: var(--bt-2);
+}
+
+.topstrip-actions button {
+  font: inherit;
+  font-size: 11px;
+  padding: 5px var(--bt-3);
+  min-height: 28px;
+  color: var(--bt-text-muted);
+  background: transparent;
+  border: 1px solid var(--bt-rule-strong);
+  border-radius: 2px;
+  cursor: pointer;
+  transition:
+    color var(--bt-t-state) var(--bt-ease),
+    border-color var(--bt-t-state) var(--bt-ease);
+}
+
+.topstrip-actions button:hover {
+  color: var(--bt-text);
+  border-color: var(--bt-accent);
+}
+
+.topstrip-actions button[data-active] {
+  color: var(--bt-accent);
+  border-color: var(--bt-accent);
+}

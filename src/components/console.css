@@ -1,0 +1,310 @@
+/**
+ * Alarm console. Rows separated by hairlines — no cards, no filled backgrounds.
+ * Severity is carried by a 2px left rule plus a dot, never by tinting the whole row.
+ */
+
+.console {
+  flex: none;
+  height: 26vh;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--bt-rule);
+  background: var(--bt-surface);
+  resize: vertical;
+  overflow: hidden;
+}
+
+.console[data-collapsed] {
+  height: auto;
+  min-height: 0;
+  resize: none;
+}
+
+/* ---- header ---- */
+
+.console-head {
+  display: flex;
+  align-items: center;
+  gap: var(--bt-4);
+  padding: 0 var(--bt-4);
+  height: 38px;
+  flex: none;
+  border-bottom: 1px solid var(--bt-rule);
+}
+
+.console-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--bt-2);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--bt-text);
+  background: transparent;
+  border: none;
+  padding: 0;
+  min-height: 32px;
+  cursor: pointer;
+}
+
+.console-chevron {
+  font-size: 8px;
+  color: var(--bt-text-faint);
+}
+
+.console-counts {
+  display: flex;
+  gap: var(--bt-3);
+}
+
+.count {
+  font-size: 11px;
+  color: var(--bt-text-muted);
+}
+
+.count-n {
+  font-size: 13px;
+  font-weight: 600;
+  margin-right: 3px;
+}
+
+.count[data-kind='critical'] .count-n {
+  color: var(--bt-fault);
+}
+
+.count[data-kind='warning'] .count-n {
+  color: var(--bt-warning);
+}
+
+/* A zero count is not news — drop it to the quiet tier rather than showing a colored 0. */
+.count[data-zero] .count-n {
+  color: var(--bt-text-faint);
+}
+
+.count[data-kind='shelved'] .count-n {
+  color: var(--bt-text-faint);
+}
+
+/* ---- filters ---- */
+
+.console-filters {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--bt-2);
+}
+
+.console-filters select {
+  font: inherit;
+  font-size: 11px;
+  padding: 4px var(--bt-2);
+  min-height: 28px;
+  color: var(--bt-text-muted);
+  background: var(--bt-bg);
+  border: 1px solid var(--bt-rule-strong);
+  border-radius: 2px;
+}
+
+.console-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--bt-text-muted);
+  cursor: pointer;
+}
+
+.console-check input {
+  accent-color: var(--bt-accent);
+}
+
+/* ---- list ---- */
+
+.console-body {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.console-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.console-empty {
+  padding: var(--bt-4);
+  font-size: 12px;
+  color: var(--bt-text-faint);
+  margin: 0;
+}
+
+.alarm {
+  display: flex;
+  align-items: center;
+  gap: var(--bt-3);
+  height: 32px;
+  padding: 0 var(--bt-4) 0 var(--bt-3);
+  border-bottom: 1px solid var(--bt-rule);
+  border-left: 2px solid transparent;
+  /* Rows fade+slide in: a flood that snaps into existence reads as broken even when the
+     logic is right. */
+  animation: bt-row-in var(--bt-t-row) var(--bt-ease);
+}
+
+@keyframes bt-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.alarm[data-severity='critical'] {
+  border-left-color: var(--bt-fault);
+}
+
+.alarm[data-severity='warning'] {
+  border-left-color: var(--bt-warning);
+}
+
+.alarm-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.alarm[data-severity='critical'] .alarm-dot {
+  background: var(--bt-fault);
+}
+
+.alarm[data-severity='warning'] .alarm-dot {
+  background: transparent;
+  border: 1.5px solid var(--bt-warning);
+}
+
+.alarm-asset {
+  font: inherit;
+  font-family: var(--bt-mono);
+  font-size: 11px;
+  width: 78px;
+  flex: none;
+  text-align: left;
+  color: var(--bt-text);
+  background: transparent;
+  border: none;
+  padding: 2px 0;
+  cursor: pointer;
+}
+
+.alarm-asset:disabled {
+  color: var(--bt-text-muted);
+  cursor: default;
+}
+
+.alarm-asset:not(:disabled):hover {
+  color: var(--bt-accent);
+  text-decoration: underline;
+}
+
+.alarm-code {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--bt-text-muted);
+  width: 120px;
+  flex: none;
+}
+
+.alarm-count {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  flex: none;
+  color: var(--bt-text);
+  border: 1px solid var(--bt-rule-strong);
+  border-radius: 2px;
+}
+
+.alarm-msg {
+  font-size: 12px;
+  color: var(--bt-text);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alarm-severity {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bt-text-faint);
+  flex: none;
+}
+
+.alarm-actions {
+  display: flex;
+  gap: var(--bt-1);
+  flex: none;
+}
+
+.alarm-actions button {
+  font: inherit;
+  font-size: 10px;
+  padding: 3px var(--bt-2);
+  min-height: 24px;
+  color: var(--bt-text-muted);
+  background: transparent;
+  border: 1px solid var(--bt-rule-strong);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.alarm-actions button:hover:not(:disabled) {
+  color: var(--bt-text);
+  border-color: var(--bt-accent);
+}
+
+.alarm-actions button:disabled {
+  color: var(--bt-text-faint);
+  cursor: default;
+}
+
+/* Acknowledged: seen, so it stops demanding attention — but it is still active. */
+.alarm[data-acked] {
+  border-left-color: var(--bt-rule-strong);
+}
+
+.alarm[data-acked] .alarm-msg,
+.alarm[data-acked] .alarm-asset {
+  color: var(--bt-text-muted);
+}
+
+.alarm[data-acked] .alarm-dot {
+  opacity: 0.4;
+}
+
+/**
+ * Shelved: dimmed and de-ruled, but NOT removed. Hiding a shelved alarm implies it was
+ * resolved, which is exactly the false reassurance the brief warns against.
+ */
+.alarm[data-shelved] {
+  border-left-color: transparent;
+}
+
+.alarm[data-shelved] .alarm-msg,
+.alarm[data-shelved] .alarm-code,
+.alarm[data-shelved] .alarm-asset,
+.alarm[data-shelved] .alarm-severity {
+  color: var(--bt-text-faint);
+}
+
+.alarm[data-shelved] .alarm-dot {
+  background: transparent;
+  border: 1px dashed var(--bt-text-faint);
+}

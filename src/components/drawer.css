@@ -1,0 +1,244 @@
+/**
+ * Detail drawer. Hairline-ruled rows, no cards — structure from alignment and type.
+ */
+
+.drawer {
+  width: 0;
+  flex: none;
+  overflow: hidden;
+  background: var(--bt-surface);
+  border-left: 1px solid var(--bt-rule);
+  display: flex;
+  flex-direction: column;
+  /* Slide in, ease-out, no bounce. */
+  transition: width var(--bt-t-drawer) var(--bt-ease);
+}
+
+.drawer[data-open] {
+  width: 360px;
+}
+
+.drawer-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--bt-3);
+  padding: var(--bt-4);
+  border-bottom: 1px solid var(--bt-rule);
+  flex: none;
+}
+
+.drawer-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 2px;
+  white-space: nowrap;
+}
+
+.drawer-id {
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: var(--bt-text-faint);
+}
+
+.drawer-close {
+  margin-left: auto;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  min-width: 28px;
+  min-height: 28px;
+  color: var(--bt-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.drawer-close:hover {
+  color: var(--bt-text);
+  border-color: var(--bt-rule-strong);
+}
+
+.drawer-scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.drawer-section {
+  padding: var(--bt-4);
+  border-bottom: 1px solid var(--bt-rule);
+}
+
+.drawer-section .label {
+  margin: 0 0 var(--bt-3);
+}
+
+.drawer-foot {
+  flex: none;
+  padding: var(--bt-2) var(--bt-4);
+  font-size: 10px;
+  color: var(--bt-text-faint);
+  border-top: 1px solid var(--bt-rule);
+}
+
+.drawer-foot kbd {
+  font-family: var(--bt-mono);
+  font-size: 9px;
+  padding: 1px 4px;
+  margin: 0 1px;
+  border: 1px solid var(--bt-rule-strong);
+  border-radius: 2px;
+}
+
+/* ---- metric rows ---- */
+
+.rows {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--bt-3);
+  min-height: 28px;
+  padding: var(--bt-1) 0;
+  border-bottom: 1px solid var(--bt-rule);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.row-label {
+  font-size: 12px;
+  color: var(--bt-text-muted);
+  display: flex;
+  flex-direction: column;
+}
+
+.row-sub {
+  font-size: 9px;
+  color: var(--bt-text-faint);
+  letter-spacing: 0.03em;
+}
+
+.row-value {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--bt-text);
+  text-align: right;
+  white-space: nowrap;
+  /* No transition: metric numbers update instantly, every tick. */
+}
+
+.row-unit {
+  font-family: var(--bt-sans);
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--bt-text-faint);
+  margin-left: 3px;
+}
+
+.row-hint {
+  font-family: var(--bt-sans);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--bt-text-faint);
+  margin-left: var(--bt-2);
+}
+
+/* An absent metric is visibly absent, never a plausible-looking zero. */
+.row[data-missing] .row-value {
+  color: var(--bt-text-faint);
+  font-weight: 400;
+}
+
+.row[data-tone='warning'] .row-value {
+  color: var(--bt-warning);
+}
+
+/* ---- connection health ---- */
+
+.conn-verdict {
+  display: block;
+  font-size: 12px;
+  margin-bottom: var(--bt-2);
+  color: var(--bt-text);
+}
+
+.conn[data-tone='fault'] .conn-verdict {
+  color: var(--bt-fault);
+}
+
+/* ---- alarms ---- */
+
+.drawer-alarms {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.drawer-alarm {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--bt-2) 0 var(--bt-2) var(--bt-3);
+  border-left: 2px solid var(--bt-rule-strong);
+  border-bottom: 1px solid var(--bt-rule);
+}
+
+.drawer-alarm:last-child {
+  border-bottom: none;
+}
+
+.drawer-alarm[data-severity='critical'] {
+  border-left-color: var(--bt-fault);
+}
+
+.drawer-alarm[data-severity='warning'] {
+  border-left-color: var(--bt-warning);
+}
+
+.drawer-alarm-code {
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: var(--bt-text-muted);
+}
+
+.drawer-alarm[data-severity='critical'] .drawer-alarm-code {
+  color: var(--bt-fault);
+}
+
+.drawer-alarm[data-severity='warning'] .drawer-alarm-code {
+  color: var(--bt-warning);
+}
+
+.drawer-alarm-msg {
+  font-size: 12px;
+  color: var(--bt-text);
+}
+
+/* ---- notes / empty ---- */
+
+.drawer-empty {
+  font-size: 12px;
+  color: var(--bt-text-faint);
+  margin: 0;
+}
+
+.drawer-note {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--bt-text-muted);
+  margin: var(--bt-3) 0 0;
+}
+
+.drawer-note[data-tone='warning'] {
+  color: var(--bt-warning);
+}
