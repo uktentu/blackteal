@@ -117,9 +117,10 @@ time-boxed (group only alarms arriving within N seconds), which I'd add next.
 attention, but shelving is an explicit operator decision. Real shelving is also time-boxed —
 "silence for 4 hours" — which I'd add with a countdown in the row.
 
-**No zoom/pan on the diagram.** At eight assets it isn't needed and would have cost time better
-spent on the alarm console. The layout is responsive (the drawer overlays rather than squeezing
-the diagram below 1100px) and the SVG scales, but there's no pan/zoom for a 60-skid site.
+**Semantic zoom stops at two levels.** The diagram zooms (wheel at cursor), pans (drag), and
+drops node detail below 0.8× — but a real 200-asset site would want a third level that clusters
+skids into blocks with rolled-up status. The mechanism (detail driven by zoom level) is in
+place; the clustering layer is the next step.
 
 **History is in-memory only**, 60 samples per asset for the sparklines. Nothing persists across
 a reload. A real deployment reads a historian.
@@ -133,6 +134,25 @@ if this were going to keep growing.
 window* as well as code; an alarm history/event log (currently only active alarms are visible,
 so an alarm that self-clears leaves no trace); and per-subsystem state on the diagram node so a
 PCS fault and a battery fault are distinguishable without opening the drawer.
+
+## Scaling notes
+
+The demo renders the brief's 8 assets, but the paths that would carry a bigger site are built
+and tested rather than assumed:
+
+- **Layout** — the data pack's hand-placed coordinates are honored; a topology *without*
+  coordinates goes through `ensureLayout`, which wraps skids into columns. Unit-tested against
+  a synthetic 60-skid site: every node placed, no overlaps, fitted view contains everything.
+- **Navigation** — wheel zoom at the cursor, drag pan, double-click reset, and clicking an
+  alarm row pans its asset into view before flashing it. The view-box math is a pure module
+  with its own tests (zoom anchoring, clamping, letterbox round-trip).
+- **Detail follows viewing distance** — below 0.8× zoom, nodes drop the metric line and keep
+  mark + name + state. Text soup at zoom-out is the classic SCADA failure.
+- **Hover stays readable at any zoom** — the tooltip is a screen-space HTML overlay anchored
+  through the view transform, not an SVG child that would scale with it.
+- **Per-tick cost is O(assets)** with memoized nodes, so one changed skid re-renders one node.
+  The known cliffs at ~10× scale are listed above (console virtualization, node clustering,
+  a historian for trends).
 
 ## Domain vocabulary
 

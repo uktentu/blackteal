@@ -2,13 +2,14 @@
  * Site diagram — SVG, not positioned divs: crisp at any size, and stroke/fill transitions
  * animate cheaply.
  *
- * Laid out from the topology data (checklist A1), using the topology's own coordinates. Note
- * those run left-to-right (substation x=80 -> skids x=300 -> load x=540) while the brief's
- * Figure 1 illustration runs right-to-left. The data wins: the brief says render from the
- * topology, and it explicitly says the art is not being evaluated.
+ * Laid out from the topology data (checklist A1). The data pack's coordinates are honored
+ * exactly; a topology without coordinates (a real 60-skid site) goes through `ensureLayout`.
+ * The view is zoomable/pannable, and detail follows viewing distance: zoomed below 0.8x the
+ * nodes drop their metric line and keep mark + name + state, because text soup at zoom-out is
+ * the classic SCADA failure.
  */
 
-import { memo, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TOPOLOGY, NAMEPLATE } from '../domain/topology';
 import type {
   Asset,
@@ -20,12 +21,22 @@ import type {
   TopologyAsset,
 } from '../domain/types';
 import { fmt, fmtMW, gridDirection, NO_DATA, powerDirection, STATE_LABEL } from './format';
+import { ensureLayout, extents, NODE_W, NODE_H } from './layout';
+import {
+  zoomAt,
+  pan,
+  centerOn,
+  contains,
+  clientToDiagram,
+  diagramToClient,
+  zoomLevel,
+  type ViewBox,
+} from './viewbox';
 import './diagram.css';
 
-const NODE_W = 164;
-const NODE_H = 50;
-const VIEW_W = 716;
-const VIEW_H = 476;
+/** The data pack is fully placed, so this is the identity — but the scale path is real. */
+const LAYOUT = ensureLayout(TOPOLOGY);
+const BASE: ViewBox = extents(LAYOUT);
 
 /**
  * Diagram labels are shorter than the topology's full labels.
@@ -37,13 +48,10 @@ const VIEW_H = 476;
 const SHORT_LABEL: Record<string, string> = {
   SUBSTATION: 'Substation',
   LOAD: 'Data Center',
-  'SKID-1': 'Skid 1',
-  'SKID-2': 'Skid 2',
-  'SKID-3': 'Skid 3',
-  'SKID-4': 'Skid 4',
-  'SKID-5': 'Skid 5',
-  'SKID-6': 'Skid 6',
 };
+
+const shortLabel = (topo: TopologyAsset) =>
+  SHORT_LABEL[topo.id] ?? topo.label.replace(/^Power\s+/, '');
 
 /** Key metric per asset type — checklist A3, "live status plus a key metric". */
 function keyMetric(asset: Asset): { value: string; unit: string } {
@@ -115,8 +123,6 @@ const AssetNode = memo(
     const { value, unit } = keyMetric(asset);
     const secondary = secondaryMetric(asset);
     const state: AssetState = asset.state;
-    const x = topo.x;
-    const y = topo.y;
 
     return (
       <g
@@ -125,7 +131,7 @@ const AssetNode = memo(
         data-selected={selected || undefined}
         data-flashed={flashed || undefined}
         data-stale={stale || undefined}
-        transform={`translate(${x} ${y})`}
+        transform={`translate(${topo.x} ${topo.y})`}
         onClick={() => onSelect(topo.id)}
         onMouseEnter={() => onHover(topo.id)}
         onMouseLeave={() => onHover(null)}
@@ -150,7 +156,7 @@ const AssetNode = memo(
         </g>
 
         <text className="node-label" x={28} y={19}>
-          {SHORT_LABEL[topo.id] ?? topo.label}
+          {shortLabel(topo)}
         </text>
 
         {/* State label — the third channel, so meaning never rests on color alone. */}
@@ -186,37 +192,6 @@ const AssetNode = memo(
     a.topo === b.topo,
 );
 
-/**
- * Hover tooltip — progressive disclosure. One or two headline metrics so an operator can
- * triage without committing to opening the drawer.
- *
- * Rendered as an SVG overlay in the diagram's own coordinate space, so it tracks the node
- * under zoom without a second positioning system.
- */
-const Tooltip = memo(function Tooltip({ topo, asset }: { topo: TopologyAsset; asset: Asset }) {
-  const lines = tooltipLines(topo, asset);
-  const w = 186;
-  const h = 20 + lines.length * 15;
-  // Flip above the node when it would otherwise run off the bottom edge.
-  const below = topo.y + NODE_H + h + 8 < VIEW_H;
-  const y = below ? topo.y + NODE_H + 8 : topo.y - h - 8;
-  const x = Math.min(topo.x, VIEW_W - w - 4);
-
-  return (
-    <g className="tip" transform={`translate(${x} ${y})`} pointerEvents="none">
-      <rect className="tip-body" width={w} height={h} rx={2} />
-      <text className="tip-title" x={10} y={16}>
-        {SHORT_LABEL[topo.id] ?? topo.label}
-      </text>
-      {lines.map((line, i) => (
-        <text key={line} className="tip-line metric" x={10} y={32 + i * 15}>
-          {line}
-        </text>
-      ))}
-    </g>
-  );
-});
-
 interface LinkProps {
   from: TopologyAsset;
   to: TopologyAsset;
@@ -229,7 +204,8 @@ interface LinkProps {
  * A connection, with power-flow direction and magnitude (the brief's "also welcome" extra).
  *
  * Direction is carried by an animated dash offset — the one motion exception in the budget,
- * because direction genuinely cannot be expressed statically. Magnitude is stroke width.
+ * because direction genuinely cannot be expressed statically — plus a static arrowhead so it
+ * survives prefers-reduced-motion. Magnitude is stroke width.
  */
 const Link = memo(function Link({ from, to, flowMW, live }: LinkProps) {
   const x1 = from.x + NODE_W;
@@ -242,7 +218,8 @@ const Link = memo(function Link({ from, to, flowMW, live }: LinkProps) {
   const magnitude = Math.min(3, 0.6 + Math.abs(flowMW) * 0.7);
   const flowing = live && Math.abs(flowMW) > 0.05;
 
-  // Arrowhead sits at the midpoint of the horizontal run, pointing the way power travels.
+  // Arrowhead sits near the destination end of the horizontal run, pointing the way power
+  // travels.
   const headX = flowMW < 0 ? x1 + 14 : x2 - 14;
   const dir = flowMW < 0 ? -1 : 1;
 
@@ -255,11 +232,8 @@ const Link = memo(function Link({ from, to, flowMW, live }: LinkProps) {
             className="link-flow"
             d={d}
             strokeWidth={magnitude}
-            // Negative flow reverses the dash march, so the motion reads the right way.
             style={{ animationDirection: flowMW < 0 ? 'reverse' : 'normal' }}
           />
-          {/* A static arrowhead as well as the moving dashes: direction is the whole point
-              of drawing flow, and it must survive prefers-reduced-motion. */}
           <path
             className="link-head"
             d={`M${headX} ${y2 - 3} L${headX + 5 * dir} ${y2} L${headX} ${y2 + 3} Z`}
@@ -280,62 +254,249 @@ interface Props {
 }
 
 export function Diagram({ site, selectedId, flashedId, stale, onSelect }: Props) {
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
 
-  const byId = useMemo(
-    () => Object.fromEntries(TOPOLOGY.assets.map((a) => [a.id, a])),
+  const [vb, setVb] = useState<ViewBox>(BASE);
+  const vbRef = useRef(vb);
+  vbRef.current = vb;
+
+  const [size, setSize] = useState({ cw: 0, ch: 0 });
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [panning, setPanning] = useState(false);
+
+  const hoverTimer = useRef<number | null>(null);
+  const drag = useRef<{ mx: number; my: number; vb: ViewBox; moved: boolean } | null>(null);
+  const suppressClick = useRef(false);
+
+  const byId = useMemo(() => Object.fromEntries(LAYOUT.assets.map((a) => [a.id, a])), []);
+
+  // Track the rendered size, so screen-space overlays can anchor to diagram coordinates.
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (el === null) return;
+    const ro = new ResizeObserver(() => {
+      const r = el.getBoundingClientRect();
+      setSize({ cw: r.width, ch: r.height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  /**
+   * Wheel zoom, attached natively: React registers root wheel listeners as passive, so a JSX
+   * onWheel cannot preventDefault and the page would scroll while the operator zooms.
+   */
+  useEffect(() => {
+    const el = svgRef.current;
+    if (el === null) return;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const r = el.getBoundingClientRect();
+      const cur = vbRef.current;
+      const p = clientToDiagram(cur, r.width, r.height, e.clientX - r.left, e.clientY - r.top);
+      setVb(zoomAt(cur, BASE, e.deltaY < 0 ? 1.15 : 1 / 1.15, p.x, p.y));
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
+  // An alarm-row jump must land in view: flash is useless on a node outside the frame.
+  useEffect(() => {
+    if (flashedId === null) return;
+    const t = byId[flashedId];
+    if (t === undefined) return;
+    const cx = t.x + NODE_W / 2;
+    const cy = t.y + NODE_H / 2;
+    if (!contains(vbRef.current, cx, cy, 24)) {
+      setVb((cur) => centerOn(cur, BASE, cx, cy));
+    }
+  }, [flashedId, byId]);
+
+  useEffect(
+    () => () => {
+      if (hoverTimer.current !== null) clearTimeout(hoverTimer.current);
+    },
     [],
   );
 
-  return (
-    <svg
-      className="diagram"
-      viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
-      preserveAspectRatio="xMidYMid meet"
-      role="group"
-      aria-label="Site single-line diagram"
-    >
-      <g className="links">
-        {TOPOLOGY.links.map((l) => {
-          const skidId = l.from === 'SUBSTATION' ? l.to : l.from;
-          const skid = site.assets[skidId] as SkidAsset | undefined;
-          const kW = skid?.pcs?.power_kW ?? 0;
+  /** Small show-delay so sweeping the pointer across six skids doesn't strobe tooltips. */
+  const onHover = useCallback((id: string | null) => {
+    if (hoverTimer.current !== null) {
+      clearTimeout(hoverTimer.current);
+      hoverTimer.current = null;
+    }
+    if (id === null) {
+      setHoveredId(null);
+      return;
+    }
+    hoverTimer.current = window.setTimeout(() => setHoveredId(id), 100);
+  }, []);
 
-          // Substation->skid carries what the grid supplies past the skid; skid->load carries
-          // the skid's discharge. Both are shown as positive magnitude toward the load.
-          const flowMW = l.from === 'SUBSTATION' ? (NAMEPLATE.pcs_kW + kW) / 1000 : -kW / 1000;
+  const handleSelect = useCallback(
+    (id: string) => {
+      // A drag that ended on a node is a pan, not a click.
+      if (suppressClick.current) {
+        suppressClick.current = false;
+        return;
+      }
+      onSelect(id);
+    },
+    [onSelect],
+  );
+
+  const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (e.button !== 0) return;
+    drag.current = { mx: e.clientX, my: e.clientY, vb, moved: false };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    const d = drag.current;
+    if (d === null) return;
+    const dx = e.clientX - d.mx;
+    const dy = e.clientY - d.my;
+    if (!d.moved && Math.hypot(dx, dy) < 4) return;
+    if (!d.moved) {
+      d.moved = true;
+      setPanning(true);
+      setHoveredId(null);
+    }
+    const r = svgRef.current!.getBoundingClientRect();
+    const scale = Math.min(r.width / d.vb.w, r.height / d.vb.h);
+    setVb(pan(d.vb, BASE, -dx / scale, -dy / scale));
+  };
+
+  const onPointerUp = () => {
+    if (drag.current?.moved) suppressClick.current = true;
+    drag.current = null;
+    setPanning(false);
+  };
+
+  const onDoubleClick = (e: React.MouseEvent) => {
+    // Reset only from the background; a double-click on a node is two selects, not a reset.
+    if ((e.target as Element).closest('.node') === null) setVb(BASE);
+  };
+
+  const zoom = zoomLevel(vb, BASE);
+  const hoveredTopo = hoveredId !== null && hoveredId !== selectedId ? byId[hoveredId] : undefined;
+
+  return (
+    <div className="diagram-wrap" ref={wrapRef}>
+      <svg
+        ref={svgRef}
+        className="diagram"
+        data-detail={zoom < 0.8 ? 'low' : 'high'}
+        data-panning={panning || undefined}
+        viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
+        preserveAspectRatio="xMidYMid meet"
+        role="group"
+        aria-label="Site single-line diagram"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onDoubleClick={onDoubleClick}
+      >
+        <g className="links">
+          {LAYOUT.links.map((l) => {
+            const skidId = l.from === 'SUBSTATION' ? l.to : l.from;
+            const skid = site.assets[skidId] as SkidAsset | undefined;
+            const kW = skid?.pcs?.power_kW ?? 0;
+
+            // Substation->skid carries what the grid supplies past the skid; skid->load
+            // carries the skid's discharge. Both drawn as magnitude toward the load.
+            const flowMW = l.from === 'SUBSTATION' ? (NAMEPLATE.pcs_kW + kW) / 1000 : -kW / 1000;
+
+            return (
+              <Link
+                key={`${l.from}->${l.to}`}
+                from={byId[l.from]}
+                to={byId[l.to]}
+                flowMW={flowMW}
+                live={!stale}
+              />
+            );
+          })}
+        </g>
+
+        <g className="nodes">
+          {LAYOUT.assets.map((topo) => (
+            <AssetNode
+              key={topo.id}
+              topo={topo}
+              asset={site.assets[topo.id]}
+              selected={selectedId === topo.id}
+              flashed={flashedId === topo.id}
+              stale={stale}
+              onSelect={handleSelect}
+              onHover={onHover}
+            />
+          ))}
+        </g>
+      </svg>
+
+      {/* Zoom controls — quiet, hairline, keyboard-reachable. */}
+      <div className="zoom-controls" role="group" aria-label="Diagram zoom">
+        <button
+          type="button"
+          aria-label="Zoom in"
+          onClick={() => setVb((v) => zoomAt(v, BASE, 1.25, v.x + v.w / 2, v.y + v.h / 2))}
+        >
+          +
+        </button>
+        <button
+          type="button"
+          aria-label="Zoom out"
+          onClick={() => setVb((v) => zoomAt(v, BASE, 1 / 1.25, v.x + v.w / 2, v.y + v.h / 2))}
+        >
+          −
+        </button>
+        <button type="button" aria-label="Reset view" onClick={() => setVb(BASE)}>
+          ⤢
+        </button>
+      </div>
+
+      {/*
+        Hover tooltip in SCREEN space, not SVG space. Inside the SVG it would scale with the
+        zoom — unreadable zoomed out, enormous zoomed in. Anchored to the node through the
+        current view transform instead.
+      */}
+      {hoveredTopo !== undefined &&
+        size.cw > 0 &&
+        (() => {
+          const lines = tooltipLines(hoveredTopo, site.assets[hoveredTopo.id]);
+          const p = diagramToClient(
+            vb,
+            size.cw,
+            size.ch,
+            hoveredTopo.x + NODE_W / 2,
+            hoveredTopo.y + NODE_H,
+          );
+          const estH = 30 + lines.length * 17;
+          const below = p.y + 10 + estH < size.ch;
+          const left = Math.min(Math.max(p.x, 100), size.cw - 100);
 
           return (
-            <Link
-              key={`${l.from}->${l.to}`}
-              from={byId[l.from]}
-              to={byId[l.to]}
-              flowMW={flowMW}
-              live={!stale}
-            />
+            <div
+              className="tip-overlay"
+              style={{
+                left,
+                top: below ? p.y + 8 : p.y - NODE_H * p.scale - 8,
+                transform: below ? 'translateX(-50%)' : 'translate(-50%, -100%)',
+              }}
+            >
+              <div className="tip-title">{shortLabel(hoveredTopo)}</div>
+              {lines.map((line) => (
+                <div key={line} className="tip-line metric">
+                  {line}
+                </div>
+              ))}
+            </div>
           );
-        })}
-      </g>
-
-      <g className="nodes">
-        {TOPOLOGY.assets.map((topo) => (
-          <AssetNode
-            key={topo.id}
-            topo={topo}
-            asset={site.assets[topo.id]}
-            selected={selectedId === topo.id}
-            flashed={flashedId === topo.id}
-            stale={stale}
-            onSelect={onSelect}
-            onHover={setHoveredId}
-          />
-        ))}
-      </g>
-
-      {/* Tooltip last, so it paints above every node. */}
-      {hoveredId !== null && hoveredId !== selectedId && (
-        <Tooltip topo={byId[hoveredId]} asset={site.assets[hoveredId]} />
-      )}
-    </svg>
+        })()}
+    </div>
   );
 }

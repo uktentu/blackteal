@@ -33,6 +33,13 @@ export const Legend = memo(function Legend({ flowing }: { flowing: boolean }) {
         </svg>
         Power flow · width = magnitude
       </span>
+
+      <span className="legend-sep" aria-hidden="true" />
+
+      {/* Discoverability for the view controls, in the quiet tier. */}
+      <span className="legend-item legend-hint">
+        Scroll to zoom · drag to pan · double-click to reset
+      </span>
     </div>
   );
 });

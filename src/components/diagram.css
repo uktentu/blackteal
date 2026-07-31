@@ -2,10 +2,59 @@
  * Diagram. Hairline rules and type do the structural work; there are no filled status cards.
  */
 
+.diagram-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
 .diagram {
   width: 100%;
   height: 100%;
   display: block;
+  cursor: grab;
+  /* Wheel zoom owns the gesture; without this, trackpads pinch-zoom the whole page. */
+  touch-action: none;
+}
+
+.diagram[data-panning] {
+  cursor: grabbing;
+}
+
+/* Semantic zoom: below 0.8x, drop the metric line and keep mark + name + state.
+   Detail follows viewing distance — a wall of unreadable numbers is worse than none. */
+.diagram[data-detail='low'] .node-metric,
+.diagram[data-detail='low'] .node-plus {
+  display: none;
+}
+
+/* ---- zoom controls ---- */
+
+.zoom-controls {
+  position: absolute;
+  top: var(--bt-2);
+  right: var(--bt-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--bt-1);
+}
+
+.zoom-controls button {
+  width: 26px;
+  height: 26px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--bt-text-muted);
+  background: var(--bt-surface);
+  border: 1px solid var(--bt-rule-strong);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.zoom-controls button:hover {
+  color: var(--bt-text);
+  border-color: var(--bt-accent);
 }
 
 /* ---- connections ---- */
@@ -203,12 +252,20 @@
   opacity: 0.85;
 }
 
-/* ---- hover tooltip: progressive disclosure before opening the drawer ---- */
+/* ---- hover tooltip: progressive disclosure before opening the drawer ----
+   Screen-space HTML overlay, so it stays the same readable size at any zoom level. */
 
-.tip-body {
-  fill: var(--bt-raised);
-  stroke: var(--bt-rule-strong);
-  stroke-width: 1;
+.tip-overlay {
+  position: absolute;
+  z-index: 6;
+  pointer-events: none;
+  background: var(--bt-raised);
+  border: 1px solid var(--bt-rule-strong);
+  border-radius: 2px;
+  padding: 7px 10px;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 30%);
+  max-width: 260px;
+  white-space: nowrap;
 }
 
 .tip-title {
@@ -216,13 +273,14 @@
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  fill: var(--bt-text-muted);
+  color: var(--bt-text-muted);
+  margin-bottom: 3px;
 }
 
 .tip-line {
-  font-size: 11px;
-  fill: var(--bt-text);
-  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--bt-text);
+  line-height: 1.4;
 }
 
 /**

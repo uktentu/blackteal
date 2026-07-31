@@ -65,3 +65,8 @@
   color: var(--bt-text-faint);
   opacity: 0.5;
 }
+
+.legend-hint {
+  color: var(--bt-text-faint);
+  font-size: 10px;
+}
