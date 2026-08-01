@@ -267,13 +267,18 @@ export const SOLAR_ROWS: Box[] = (() => {
   return out;
 })();
 
-/** A second array further out, catching the far edge of the frame. */
+/**
+ * A second array, set well back on the far side.
+ *
+ * Moved clear of the near campus: at its previous position it sat almost entirely above the
+ * visible window while still claiming the ground the adjacent halls needed — so it was
+ * silently blocking buildings nobody could see it blocking.
+ */
 export const SOLAR_FAR: Box[] = (() => {
   const out: Box[] = [];
-  // A second array on the far side, cut by the top edge of the frame.
-  for (let col = 0; col < 7; col++) {
-    for (let row = 0; row < 5; row++) {
-      const b = plot(-560 + col * 72, -400 + row * 44, 58, PANEL.depth);
+  for (let col = 0; col < 6; col++) {
+    for (let row = 0; row < 4; row++) {
+      const b = plot(300 + col * 70, -560 + row * 42, 56, PANEL.depth);
       if (intersects(b, COMPOUND, 24) || onTrack(b, 6)) continue;
       CLAIMED.push(b);
       out.push(b);
@@ -303,6 +308,38 @@ export interface Hall {
 }
 
 /**
+ * Halls immediately beside the data centre.
+ *
+ * A ~38 MW facility is one building of a campus, not a lone shed. These sit close enough to
+ * read as the same site as the main hall, and are rendered a tier brighter than the outlying
+ * halls so the scene has depth: plant, then near campus, then distant context.
+ */
+const NEAR_HALL_SPEC: [u: number, v: number, w: number, d: number, h: number][] = [
+  [-268, -130, 76, 52, 28],
+  [-300, 20, 70, 48, 25],
+  [-190, -232, 72, 50, 26],
+  [-402, -78, 66, 46, 24],
+];
+
+export const NEAR_HALLS: Hall[] = NEAR_HALL_SPEC.flatMap(([u, v, w, d, h]) => {
+  const box = claim(plot(u, v, w, d, 0, h), 20);
+  if (box === null) return [];
+  const plant: Box[] = [];
+  for (let i = 0; i < 3; i++) {
+    plant.push({
+      x: box.x + 8 + i * ((box.w - 16) / 3),
+      y: h,
+      z: box.z + box.d * 0.32,
+      w: 8,
+      h: 4,
+      d: 8,
+    });
+  }
+  return [{ box, plant }];
+});
+
+
+/**
  * Other halls on the campus.
  *
  * A 38 MW facility is rarely alone — sites like this are campuses, and neighbouring halls are
@@ -310,18 +347,17 @@ export interface Hall {
  * buildings at a distance, and nothing about them should invite a click.
  */
 const HALL_SPEC: [u: number, v: number, w: number, d: number, h: number][] = [
-  // Left flank, where the frame was emptiest.
-  [-470, -180, 92, 62, 30],
-  [-360, -60, 78, 54, 26],
-  [-500, 60, 84, 58, 28],
-  [-250, -230, 74, 52, 25],
+  // Left flank, set back beyond the near campus.
+  [-500, -210, 90, 60, 30],
+  [-520, 96, 82, 56, 28],
+  [-470, 232, 78, 54, 26],
   // Bottom-right, balancing the solar block.
   [560, 330, 88, 60, 29],
-  [660, 170, 76, 52, 26],
-  [430, 410, 80, 56, 27],
-  // Far side, cut by the frame so the campus reads as continuing.
-  [-560, 260, 86, 58, 28],
-  [700, -180, 82, 56, 27],
+  [664, 176, 76, 52, 26],
+  [432, 414, 80, 56, 27],
+  // Cut by the frame, so the campus reads as continuing past it.
+  [700, -170, 82, 56, 27],
+  [-560, 380, 84, 56, 27],
 ];
 
 export const HALLS: Hall[] = HALL_SPEC.flatMap(([u, v, w, d, h]) => {
@@ -352,16 +388,16 @@ export interface House {
 }
 
 const HOUSE_SPEC: [u: number, v: number, w: number, d: number, h: number, roof: number][] = [
-  [-470, 300, 28, 22, 15, 11],
-  [-418, 330, 22, 20, 13, 10],
-  [-436, 262, 24, 20, 14, 10],
-  [-360, 306, 30, 24, 16, 12],
-  [-366, 372, 22, 18, 12, 9],
-  [-300, 340, 26, 22, 15, 11],
-  [-306, 274, 20, 18, 12, 9],
-  [-240, 366, 28, 22, 16, 12],
-  [-236, 296, 24, 20, 14, 10],
-  [-160, 388, 22, 18, 12, 9],
+  [-476, 296, 28, 22, 15, 11],
+  [-420, 336, 22, 20, 13, 10],
+  [-440, 254, 24, 20, 14, 10],
+  [-356, 300, 30, 24, 16, 12],
+  [-292, 264, 20, 18, 12, 9],
+  [-286, 342, 26, 22, 15, 11],
+  [-222, 300, 24, 20, 14, 10],
+  [-216, 378, 28, 22, 16, 12],
+  [-150, 336, 22, 18, 12, 9],
+  [-146, 412, 24, 20, 13, 10],
 ];
 
 export const HOUSES: House[] = HOUSE_SPEC.flatMap(([u, v, w, d, h, roof]) => {
@@ -408,9 +444,6 @@ export const TREES: Tree[] = (() => {
   return out;
 })();
 
-/** Compound boundary fence, in screen-aligned units. */
-export const FENCE = { u: -230, v: -60, du: 580, dv: 280 };
-
 // ---------------------------------------------------------------------------
 // Neighbouring data-centre campus
 // ---------------------------------------------------------------------------
@@ -444,10 +477,10 @@ export const SILOS: Silo[] = (
 /** Barns: bigger pitched-roof sheds, distinct from the houses. */
 export const BARNS: House[] = (
   [
-    [-520, 372, 52, 34, 16, 14],
-    [-566, 150, 44, 30, 14, 12],
-    [-60, 402, 50, 32, 15, 13],
-    [250, 404, 46, 30, 14, 12],
+    // Only positions verified clear of the village, silos, solar and the access track.
+    // The ground is genuinely full at this point, which is why there are two and not five.
+    [66, 350, 44, 28, 14, 12],
+    [-590, 170, 46, 30, 15, 13],
   ] as [number, number, number, number, number, number][]
 ).flatMap(([u, v, w, d, h, roof]) => {
   const box = claim(plot(u, v, w, d, 0, h), 14);

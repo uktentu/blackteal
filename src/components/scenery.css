@@ -141,13 +141,7 @@
 
 /* ---- compound boundary ---- */
 
-.scn-fence {
-  fill: none;
-  stroke: #39424d;
-  stroke-width: 1;
-  stroke-dasharray: 6 5;
-  opacity: 0.7;
-}
+
 
 /* ---- neighbouring campus halls ----
    Muted and detail-light: they read as buildings at a distance, and nothing about them should
@@ -181,4 +175,24 @@
   fill: #353e49;
   stroke: #3d4753;
   stroke-width: 0.5;
+}
+
+/**
+ * Near-campus tier.
+ *
+ * A step brighter than the outlying halls so the site has depth — plant, then the buildings
+ * beside it, then the distant context — while still sitting clearly below the plant's own
+ * concrete. Three tiers read as distance; two read as a mistake.
+ */
+.scn-hall[data-near] .scn-hall-top {
+  fill: #3a434d;
+  stroke: #454f5a;
+}
+.scn-hall[data-near] .scn-hall-right {
+  fill: #29313a;
+  stroke: #333c45;
+}
+.scn-hall[data-near] .scn-hall-left {
+  fill: #1d2329;
+  stroke: #262d34;
 }

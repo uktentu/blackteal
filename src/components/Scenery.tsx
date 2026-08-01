@@ -13,10 +13,10 @@ import { memo } from 'react';
 import { boxFaces, polygon, project, quad } from './iso/iso';
 import {
   BARNS,
-  FENCE,
   fromScreen,
   HALLS,
   HOUSES,
+  NEAR_HALLS,
   LAND_CORNERS,
   MEADOWS,
   PANEL,
@@ -150,11 +150,15 @@ export const Scenery = memo(function Scenery({ yaw }: { yaw: number }) {
       <SolarBlock rows={SOLAR_FAR} yaw={yaw} cls="scn-solar scn-solar-far" />
       <SolarBlock rows={SOLAR_ROWS} yaw={yaw} cls="scn-solar" />
 
-      {/* ---- neighbouring campus halls: flat-roofed, with rooftop plant ---- */}
-      {HALLS.map((h, i) => {
+      {/*
+        The campus, in two depth tiers. Halls beside the data centre are mid-tone so they
+        read as part of the same site; the outlying ones are darker and sit back. Both stay
+        clearly below the plant's concrete.
+      */}
+      {[...HALLS.map((h) => ({ h, near: false })), ...NEAR_HALLS.map((h) => ({ h, near: true }))].map(({ h, near }, i) => {
         const f = boxFaces(h.box, yaw);
         return (
-          <g key={`hall${i}`} className="scn-hall">
+          <g key={`hall${i}`} className="scn-hall" data-near={near || undefined}>
             <polygon
               className="scn-shadow"
               points={quad(h.box.x + 3, 0.03, h.box.z + 3, h.box.w, h.box.d, yaw)}
@@ -261,16 +265,12 @@ export const Scenery = memo(function Scenery({ yaw }: { yaw: number }) {
         );
       })}
 
-      {/* ---- compound fence: where the operator's responsibility begins ---- */}
-      <polygon
-        className="scn-fence"
-        points={polygon([
-          g(FENCE.u, FENCE.v, yaw, 0.08),
-          g(FENCE.u + FENCE.du, FENCE.v, yaw, 0.08),
-          g(FENCE.u + FENCE.du, FENCE.v + FENCE.dv, yaw, 0.08),
-          g(FENCE.u, FENCE.v + FENCE.dv, yaw, 0.08),
-        ])}
-      />
+      {/*
+        No compound fence.
+        A dashed rectangle around the plant read as a selection box rather than a boundary —
+        and worse, dashed strokes already mean OFFLINE in this app's visual language, so it
+        was actively ambiguous. The raised concrete pad already reads as the site edge.
+      */}
     </g>
   );
 });
