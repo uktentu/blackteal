@@ -87,9 +87,9 @@ export const Scenery = memo(function Scenery({ yaw }: { yaw: number }) {
         {/* Panel glass: a cool sheen across the tilt, so a row reads as a surface catching
             light rather than as a flat slab. */}
         <linearGradient id="pvFace" x1="0" y1="0" x2="0.3" y2="1">
-          <stop offset="0%" stopColor="#3c5170" />
-          <stop offset="55%" stopColor="#2b3b53" />
-          <stop offset="100%" stopColor="#212f42" />
+          <stop offset="0%" stopColor="#2c3d55" />
+          <stop offset="55%" stopColor="#212d40" />
+          <stop offset="100%" stopColor="#1a2433" />
         </linearGradient>
         {/*
           Atmospheric falloff, centred on the compound. Bright at the plant, sinking to the

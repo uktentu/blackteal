@@ -28,7 +28,24 @@ import {
   LINE_ATTACH,
   PYLON,
 } from './layout';
-import { HOUSES, MEADOWS, SOLAR_ROWS, TREES, TUFTS, TURBINES, COMPOUND, LAND_U, LAND_V } from './scenery';
+import {
+  BARNS,
+  COMPOUND,
+  HALLS,
+  HOUSES,
+  LAND_U,
+  LAND_V,
+  MEADOWS,
+  SILOS,
+  SOLAR_ROWS,
+  TRACKS,
+  TREES,
+  TUFTS,
+  TURBINES,
+  VIEW_U,
+  VIEW_V,
+  fromScreen,
+} from './scenery';
 
 const box = (x: number, y: number, z: number): Box => ({ x, y, z, w: 10, h: 10, d: 10 });
 
@@ -209,6 +226,67 @@ describe('site layout', () => {
 describe('site context', () => {
   const overlaps = (a: Box, b: Box) =>
     a.x < b.x + b.w && b.x < a.x + a.w && a.z < b.z + b.d && b.z < a.z + a.d;
+
+  /** Every structure that occupies ground, as a flat footprint. */
+  const structures = (): { n: string; b: Box }[] => [
+    ...HALLS.map((h, i) => ({ n: `hall${i}`, b: h.box })),
+    ...HOUSES.map((h, i) => ({ n: `house${i}`, b: h.box })),
+    ...BARNS.map((h, i) => ({ n: `barn${i}`, b: h.box })),
+    ...SILOS.map((s, i) => ({
+      n: `silo${i}`,
+      b: { x: s.x - s.r, y: 0, z: s.z - s.r, w: s.r * 2, h: 0, d: s.r * 2 },
+    })),
+  ];
+
+  it('never spawns a building inside another building', () => {
+    // Placement was hand-listed by coordinate and only ever checked against the compound,
+    // which produced a hall standing inside a barn.
+    const all = structures();
+    for (let i = 0; i < all.length; i++) {
+      for (let j = i + 1; j < all.length; j++) {
+        expect(overlaps(all[i].b, all[j].b), `${all[i].n} overlaps ${all[j].n}`).toBe(false);
+      }
+    }
+  });
+
+  it('never spawns a building inside the solar array', () => {
+    for (const s of structures()) {
+      for (const r of SOLAR_ROWS) {
+        expect(overlaps(s.b, r), `${s.n} sits in the solar array`).toBe(false);
+      }
+    }
+  });
+
+  it('never spawns a building across an access track', () => {
+    for (const s of structures()) {
+      for (const t of TRACKS) {
+        for (let k = 0; k < t.points.length - 1; k++) {
+          for (let f = 0; f <= 1; f += 0.05) {
+            const u = t.points[k].u + (t.points[k + 1].u - t.points[k].u) * f;
+            const v = t.points[k].v + (t.points[k + 1].v - t.points[k].v) * f;
+            const p = fromScreen(u, v);
+            const on =
+              p.x >= s.b.x && p.x <= s.b.x + s.b.w && p.z >= s.b.z && p.z <= s.b.z + s.b.d;
+            expect(on, `${s.n} straddles a track`).toBe(false);
+          }
+        }
+      }
+    }
+  });
+
+  it('places scenery inside the window the camera can actually see', () => {
+    // A village, three barns and four silos were once placed below the visible range and had
+    // never appeared in a single frame.
+    let visible = 0;
+    for (const s of structures()) {
+      const u = s.b.x - s.b.z;
+      const v = s.b.x + s.b.z;
+      if (u > VIEW_U.min - 120 && u < VIEW_U.max + 120 && v > VIEW_V.min - 120 && v < VIEW_V.max + 120) {
+        visible++;
+      }
+    }
+    expect(visible / structures().length).toBeGreaterThan(0.8);
+  });
 
   it('never places scenery on the plant compound', () => {
     // Scenery drifting onto the compound would sit under the skids and read as a rendering

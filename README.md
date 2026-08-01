@@ -16,7 +16,7 @@ npm run dev          # http://localhost:5173
 ```
 
 ```bash
-npm test             # 168 tests: pure logic + component/interaction tests
+npm test             # 172 tests: pure logic + component/interaction tests
 npm run build        # typecheck + production build to dist/
 npm run check        # typecheck + lint + tests
 ```
@@ -185,7 +185,7 @@ click-to-open: capturing the pointer on the SVG root retargets the click away fr
 **History is in-memory only**, 60 samples per asset for the sparklines. Nothing persists across
 a reload. A real deployment reads a historian.
 
-**Component tests instead of full E2E.** 168 tests: the pure logic (simulator, rules, alarm
+**Component tests instead of full E2E.** 172 tests: the pure logic (simulator, rules, alarm
 feed, event log) plus 26 component tests driving the real DOM via Testing Library — click an
 asset opens its panel, a missing metric renders a dash, a flood groups, Escape closes. These
 exist because a zoom feature once broke click-to-open while every logic test stayed green.

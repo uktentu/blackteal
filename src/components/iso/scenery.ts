@@ -56,6 +56,16 @@ function plot(u: number, v: number, w: number, d: number, y = 0, h = 0): Box {
   return { x: c.x - w / 2, y, z: c.z - d / 2, w, h, d };
 }
 
+/**
+ * Everything already standing, so later placements can avoid it.
+ *
+ * Buildings were previously hand-listed by coordinate and only checked against the compound.
+ * The result was a hall on the plant itself, one hall inside a barn, two buildings in the
+ * middle of the solar array and three straddling the access road. Placement now rejects
+ * against every prior claim, and the tests assert it stays that way.
+ */
+const CLAIMED: Box[] = [];
+
 function intersects(a: Box, b: Box, margin = 0): boolean {
   return (
     a.x < b.x + b.w + margin &&
@@ -65,11 +75,63 @@ function intersects(a: Box, b: Box, margin = 0): boolean {
   );
 }
 
+/** True when a footprint straddles a track centreline. */
+function onTrack(b: Box, pad = 10): boolean {
+  for (const t of TRACK_SPEC) {
+    for (let k = 0; k < t.length - 1; k++) {
+      for (let s = 0; s <= 1; s += 0.04) {
+        const u = t[k].u + (t[k + 1].u - t[k].u) * s;
+        const v = t[k].v + (t[k + 1].v - t[k].v) * s;
+        const p = fromScreen(u, v);
+        if (
+          p.x >= b.x - pad &&
+          p.x <= b.x + b.w + pad &&
+          p.z >= b.z - pad &&
+          p.z <= b.z + b.d + pad
+        ) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Claim a footprint, or return null if it collides with anything already standing.
+ * Callers skip what they cannot place rather than overlapping it.
+ */
+function claim(b: Box, margin = 12): Box | null {
+  if (intersects(b, COMPOUND, 26)) return null;
+  if (onTrack(b)) return null;
+  if (CLAIMED.some((c) => intersects(b, c, margin))) return null;
+  CLAIMED.push(b);
+  return b;
+}
+
 /** Deterministic hash noise: the landscape must be identical on every load. */
 function rand(i: number, salt = 0): number {
   const x = Math.sin(i * 127.1 + salt * 311.7) * 43758.5453;
   return x - Math.floor(x);
 }
+
+/** Dirt access tracks, angled across the site the way a service road actually runs. */
+const TRACK_SPEC: { u: number; v: number }[][] = [
+  [
+    { u: -2800, v: 420 },
+    { u: -520, v: 268 },
+    { u: -180, v: 226 },
+    { u: 300, v: 258 },
+    { u: 900, v: 390 },
+    { u: 2800, v: 700 },
+  ],
+  [
+    { u: 300, v: -1600 },
+    { u: 350, v: -420 },
+    { u: 380, v: -60 },
+    { u: 400, v: 240 },
+  ],
+];
 
 // ---------------------------------------------------------------------------
 // Terrain variation
@@ -197,7 +259,8 @@ export const SOLAR_ROWS: Box[] = (() => {
   for (let col = 0; col < 10; col++) {
     for (let row = 0; row < 12; row++) {
       const b = plot(390 + col * 74, -300 + row * 46, 62, PANEL.depth);
-      if (intersects(b, COMPOUND, 24)) continue;
+      if (intersects(b, COMPOUND, 24) || onTrack(b, 6)) continue;
+      CLAIMED.push(b);
       out.push(b);
     }
   }
@@ -210,7 +273,10 @@ export const SOLAR_FAR: Box[] = (() => {
   // A second array on the far side, cut by the top edge of the frame.
   for (let col = 0; col < 7; col++) {
     for (let row = 0; row < 5; row++) {
-      out.push(plot(-560 + col * 72, -400 + row * 44, 58, PANEL.depth));
+      const b = plot(-560 + col * 72, -400 + row * 44, 58, PANEL.depth);
+      if (intersects(b, COMPOUND, 24) || onTrack(b, 6)) continue;
+      CLAIMED.push(b);
+      out.push(b);
     }
   }
   return out;
@@ -225,29 +291,56 @@ export interface Track {
   halfWidth: number;
 }
 
-/** Dirt access tracks, angled across the site the way a service road actually runs. */
-export const TRACKS: Track[] = [
-  {
-    halfWidth: 9,
-    points: [
-      { u: -2800, v: 420 },
-      { u: -520, v: 268 },
-      { u: -180, v: 226 },
-      { u: 300, v: 258 },
-      { u: 900, v: 390 },
-      { u: 2800, v: 700 },
-    ],
-  },
-  {
-    halfWidth: 5,
-    points: [
-      { u: 300, v: -1600 },
-      { u: 350, v: -420 },
-      { u: 380, v: -60 },
-      { u: 400, v: 240 },
-    ],
-  },
+export const TRACKS: Track[] = TRACK_SPEC.map((points, i) => ({
+  points,
+  halfWidth: i === 0 ? 9 : 5,
+}));
+
+export interface Hall {
+  box: Box;
+  /** Rooftop plant units. */
+  plant: Box[];
+}
+
+/**
+ * Other halls on the campus.
+ *
+ * A 38 MW facility is rarely alone — sites like this are campuses, and neighbouring halls are
+ * what give the plant its sense of scale. Deliberately muted and detail-light: they read as
+ * buildings at a distance, and nothing about them should invite a click.
+ */
+const HALL_SPEC: [u: number, v: number, w: number, d: number, h: number][] = [
+  // Left flank, where the frame was emptiest.
+  [-470, -180, 92, 62, 30],
+  [-360, -60, 78, 54, 26],
+  [-500, 60, 84, 58, 28],
+  [-250, -230, 74, 52, 25],
+  // Bottom-right, balancing the solar block.
+  [560, 330, 88, 60, 29],
+  [660, 170, 76, 52, 26],
+  [430, 410, 80, 56, 27],
+  // Far side, cut by the frame so the campus reads as continuing.
+  [-560, 260, 86, 58, 28],
+  [700, -180, 82, 56, 27],
 ];
+
+export const HALLS: Hall[] = HALL_SPEC.flatMap(([u, v, w, d, h]) => {
+  const box = claim(plot(u, v, w, d, 0, h), 22);
+  if (box === null) return [];
+  const plant: Box[] = [];
+  // Rooftop chillers in a neat row, as on the real thing.
+  for (let i = 0; i < 4; i++) {
+    plant.push({
+      x: box.x + 8 + i * ((box.w - 16) / 4),
+      y: h,
+      z: box.z + box.d * 0.3,
+      w: 9,
+      h: 4,
+      d: 9,
+    });
+  }
+  return [{ box, plant }];
+});
 
 // ---------------------------------------------------------------------------
 // Village
@@ -271,10 +364,10 @@ const HOUSE_SPEC: [u: number, v: number, w: number, d: number, h: number, roof: 
   [-160, 388, 22, 18, 12, 9],
 ];
 
-export const HOUSES: House[] = HOUSE_SPEC.map(([u, v, w, d, h, roof]) => ({
-  box: plot(u, v, w, d, 0, h),
-  roof,
-}));
+export const HOUSES: House[] = HOUSE_SPEC.flatMap(([u, v, w, d, h, roof]) => {
+  const box = claim(plot(u, v, w, d, 0, h), 10);
+  return box === null ? [] : [{ box, roof }];
+});
 
 // ---------------------------------------------------------------------------
 // Turbines and trees
@@ -322,51 +415,6 @@ export const FENCE = { u: -230, v: -60, du: 580, dv: 280 };
 // Neighbouring data-centre campus
 // ---------------------------------------------------------------------------
 
-export interface Hall {
-  box: Box;
-  /** Rooftop plant units. */
-  plant: Box[];
-}
-
-/**
- * Other halls on the campus.
- *
- * A 38 MW facility is rarely alone — sites like this are campuses, and neighbouring halls are
- * what give the plant its sense of scale. Deliberately muted and detail-light: they read as
- * buildings at a distance, and nothing about them should invite a click.
- */
-const HALL_SPEC: [u: number, v: number, w: number, d: number, h: number][] = [
-  // Left flank, where the frame was emptiest.
-  [-470, -180, 92, 62, 30],
-  [-360, -60, 78, 54, 26],
-  [-500, 60, 84, 58, 28],
-  [-250, -230, 74, 52, 25],
-  // Bottom-right, balancing the solar block.
-  [560, 330, 88, 60, 29],
-  [660, 170, 76, 52, 26],
-  [430, 410, 80, 56, 27],
-  // Far side, cut by the frame so the campus reads as continuing.
-  [-560, 260, 86, 58, 28],
-  [700, -180, 82, 56, 27],
-];
-
-export const HALLS: Hall[] = HALL_SPEC.map(([u, v, w, d, h]) => {
-  const box = plot(u, v, w, d, 0, h);
-  const plant: Box[] = [];
-  // Rooftop chillers in a neat row, as on the real thing.
-  for (let i = 0; i < 4; i++) {
-    plant.push({
-      x: box.x + 8 + i * ((box.w - 16) / 4),
-      y: h,
-      z: box.z + box.d * 0.3,
-      w: 9,
-      h: 4,
-      d: 9,
-    });
-  }
-  return { box, plant };
-});
-
 // ---------------------------------------------------------------------------
 // Farm structures
 // ---------------------------------------------------------------------------
@@ -379,20 +427,29 @@ export interface Silo {
 }
 
 /** Grain silos beside the village — vertical accents in an otherwise flat middle distance. */
-export const SILOS: Silo[] = [
-  { ...fromScreen(-470, 396), r: 9, h: 32 },
-  { ...fromScreen(-446, 418), r: 9, h: 28 },
-  { ...fromScreen(-422, 396), r: 8, h: 24 },
-  { ...fromScreen(120, 400), r: 9, h: 30 },
-  { ...fromScreen(146, 420), r: 8, h: 26 },
-];
+export const SILOS: Silo[] = (
+  [
+    [-462, 402, 9, 32],
+    [-436, 424, 9, 28],
+    [-410, 402, 8, 24],
+    [110, 406, 9, 30],
+    [138, 428, 8, 26],
+  ] as [number, number, number, number][]
+).flatMap(([u, v, r, h]) => {
+  const c = fromScreen(u, v);
+  const box = claim({ x: c.x - r, y: 0, z: c.z - r, w: r * 2, h: 0, d: r * 2 }, 6);
+  return box === null ? [] : [{ x: c.x, z: c.z, r, h }];
+});
 
 /** Barns: bigger pitched-roof sheds, distinct from the houses. */
 export const BARNS: House[] = (
   [
-    [-520, 360, 52, 34, 16, 14],
-    [-540, 200, 44, 30, 14, 12],
-    [-40, 400, 50, 32, 15, 13],
-    [260, 396, 46, 30, 14, 12],
+    [-520, 372, 52, 34, 16, 14],
+    [-566, 150, 44, 30, 14, 12],
+    [-60, 402, 50, 32, 15, 13],
+    [250, 404, 46, 30, 14, 12],
   ] as [number, number, number, number, number, number][]
-).map(([u, v, w, d, h, roof]) => ({ box: plot(u, v, w, d, 0, h), roof }));
+).flatMap(([u, v, w, d, h, roof]) => {
+  const box = claim(plot(u, v, w, d, 0, h), 14);
+  return box === null ? [] : [{ box, roof }];
+});

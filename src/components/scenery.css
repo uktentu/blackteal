@@ -1,13 +1,14 @@
 /**
  * Landscape materials.
  *
- * The governing idea is FIGURE AND GROUND, not realism. The compound is the brightest, crispest
- * thing on screen and everything else falls away from it — a radial falloff carries the eye to
- * the plant, hides the terrain's edges, and creates depth in a single move.
+ * The governing idea is FIGURE AND GROUND. The compound is the brightest, crispest thing on
+ * screen and everything else falls away from it.
  *
- * An earlier pass compressed every element into a few percent of the value range chasing a
- * photographic look, and the result was uniformly dark and muddy. This one spends real contrast,
- * and spends it on the plant.
+ * Every surface here sits roughly HALF the value of the plant's concrete (plant tops #5b6775,
+ * context tops around #2d353d). That gap is deliberate and load-bearing: with the context at
+ * similar brightness the neighbouring halls competed with the skids for attention, which is
+ * exactly backwards on a monitoring screen. Scenery is here to give the plant scale and a
+ * place, never to be looked at.
  */
 
 .scn {
@@ -16,7 +17,7 @@
 
 /* Base terrain. Lighter than before so the scene has somewhere to fall away *to*. */
 .scn-ground {
-  fill: #1b2226;
+  fill: #161c20;
 }
 
 /**
@@ -37,27 +38,27 @@
   opacity: 0.5;
 }
 .scn-meadow[data-tone='1'] {
-  fill: #232c2b;
+  fill: #1c2423;
 }
 .scn-meadow[data-tone='2'] {
-  fill: #26302a;
+  fill: #1e2722;
 }
 .scn-meadow[data-tone='3'] {
-  fill: #1f292f;
+  fill: #192126;
 }
 
 /* Near-field ground detail only. */
 .scn-tufts path {
-  stroke: #38443c;
+  stroke: #2b342f;
   stroke-width: 0.7;
   stroke-linecap: round;
   fill: none;
-  opacity: 0.5;
+  opacity: 0.45;
 }
 
 .scn-track {
-  fill: #2a3036;
-  opacity: 0.85;
+  fill: #212630;
+  opacity: 0.8;
 }
 
 /* ---- solar: crisp glass, read as rhythm rather than as a dark mass ---- */
@@ -69,14 +70,14 @@
 
 .scn-panel {
   fill: url(#pvFace);
-  stroke: #3b4d66;
+  stroke: #2c3a4d;
   stroke-width: 0.5;
-  opacity: 0.85;
+  opacity: 0.7;
 }
 
 /* The far block sits back in the haze. */
 .scn-solar-far {
-  opacity: 0.4;
+  opacity: 0.3;
 }
 
 /* ---- village ---- */
@@ -87,47 +88,47 @@
 }
 
 .scn-wall {
-  stroke: #3d4753;
+  stroke: #2b333c;
   stroke-width: 0.5;
 }
 .scn-wall-left {
-  fill: #2e3742;
+  fill: #222932;
 }
 .scn-wall-right {
-  fill: #212932;
+  fill: #191f26;
 }
 
 .scn-roof {
-  stroke: #4a5462;
+  stroke: #333c46;
   stroke-width: 0.5;
 }
 .scn-roof-front {
-  fill: #47525f;
+  fill: #313a44;
 }
 .scn-roof-back {
-  fill: #333c47;
+  fill: #242c34;
 }
 
 /* ---- trees ---- */
 
 .scn-trunk {
-  stroke: #333a38;
-  stroke-width: 1.4;
+  stroke: #272d2c;
+  stroke-width: 1.3;
   stroke-linecap: round;
 }
 
 .scn-canopy {
-  fill: #2b3a31;
-  stroke: #36473b;
-  stroke-width: 0.6;
+  fill: #212d26;
+  stroke: #2a3730;
+  stroke-width: 0.5;
 }
 
 /* ---- turbines ---- */
 
 .scn-mast,
 .scn-blade {
-  stroke: #56616e;
-  stroke-width: 1.1;
+  stroke: #3e4753;
+  stroke-width: 1;
   stroke-linecap: round;
   fill: none;
 }
@@ -135,14 +136,14 @@
   stroke-width: 1.5;
 }
 .scn-hub {
-  fill: #56616e;
+  fill: #3e4753;
 }
 
 /* ---- compound boundary ---- */
 
 .scn-fence {
   fill: none;
-  stroke: #46515e;
+  stroke: #39424d;
   stroke-width: 1;
   stroke-dasharray: 6 5;
   opacity: 0.7;
@@ -153,31 +154,31 @@
    invite a click. Kept a full step below the plant's concrete so the compound still leads. */
 
 .scn-hall-top {
-  fill: #3f4956;
-  stroke: #4a5563;
+  fill: #2d353d;
+  stroke: #363f48;
   stroke-width: 0.5;
 }
 .scn-hall-right {
-  fill: #2b333d;
-  stroke: #363f4a;
+  fill: #1f262d;
+  stroke: #283039;
   stroke-width: 0.5;
 }
 .scn-hall-left {
-  fill: #1e242c;
-  stroke: #2a313a;
+  fill: #161b21;
+  stroke: #1e252c;
   stroke-width: 0.5;
 }
 
 /* ---- silos ---- */
 
 .scn-silo-body {
-  fill: #39434e;
-  stroke: #454f5c;
+  fill: #29313a;
+  stroke: #323b45;
   stroke-width: 0.5;
 }
 
 .scn-silo-cap {
-  fill: #4b5665;
-  stroke: #545f6e;
+  fill: #353e49;
+  stroke: #3d4753;
   stroke-width: 0.5;
 }
