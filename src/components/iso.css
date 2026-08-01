@@ -32,14 +32,15 @@
 
 /* Wider separation between the three faces than a flat scheme would give: form has to read
    from silhouette alone, because there is no colour available to help. */
+/* The compound is the brightest, crispest object in the frame — that is the whole hierarchy. */
 .iso-top {
-  fill: #3c4551;
+  fill: #5b6775;
 }
 .iso-right {
-  fill: #272f38;
+  fill: #3a444f;
 }
 .iso-left {
-  fill: #191f25;
+  fill: #262d35;
 }
 
 /* Contact shadow — what stops every building from appearing to float. */
@@ -49,22 +50,22 @@
 }
 
 .iso-grid path {
-  stroke: var(--bt-rule);
+  stroke: #4a5560;
   stroke-width: 0.4;
-  opacity: 0.4;
+  opacity: 0.35;
   fill: none;
 }
 
 /* ---- ground ---- */
 
 .iso-ground-top {
-  fill: #1d232a;
+  fill: #2c343c;
   stroke: var(--bt-rule);
   stroke-width: 0.6;
 }
 
 .iso-ground-side {
-  fill: #171c22;
+  fill: #1b2127;
   stroke: var(--bt-rule);
   stroke-width: 0.6;
 }
@@ -72,21 +73,21 @@
 /* ---- ancillary structures: pads, radiators, rooftop plant ---- */
 
 .iso-kit .iso-top {
-  fill: #2b323b;
+  fill: #4a5460;
 }
 .iso-kit .iso-right {
-  fill: #212830;
+  fill: #333c46;
 }
 .iso-kit .iso-left {
-  fill: #1a2027;
+  fill: #232a32;
 }
 
 .iso-pad .iso-top {
-  fill: #242b33;
+  fill: #39424c;
 }
 .iso-pad .iso-right,
 .iso-pad .iso-left {
-  fill: #1b2128;
+  fill: #262d35;
 }
 
 /* ---- feeder runs on the ground ---- */
@@ -139,10 +140,10 @@
 }
 
 .iso-asset:hover .iso-top {
-  fill: #4a5461;
+  fill: #6d7a89;
 }
 .iso-asset:hover .iso-right {
-  fill: #303945;
+  fill: #47525f;
 }
 
 /**

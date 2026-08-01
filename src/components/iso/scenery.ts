@@ -153,12 +153,13 @@ export const TUFTS: Tuft[] = (() => {
   // Scattered around the compound rather than across the whole land: the terrain is far
   // larger than the frame, and spreading a fixed budget over all of it would leave the
   // visible area bare.
-  for (let i = 0; i < 2600; i++) {
-    const u = 90 + (rand(i, 1) - 0.5) * 2600;
-    const v = 140 + (rand(i, 2) - 0.5) * 1500;
+  for (let i = 0; i < 900; i++) {
+    const u = 90 + (rand(i, 1) - 0.5) * 1500;
+    const v = 140 + (rand(i, 2) - 0.5) * 900;
 
+    // A tight detail band near the plant only. Spread wide it reads as noise, not ground.
     const d = Math.hypot(u - 90, (v - 140) * 1.7);
-    if (rand(i, 3) > Math.max(0.16, 1 - d / 1500)) continue;
+    if (d > 620 || rand(i, 3) > 0.5) continue;
 
     const p = fromScreen(u, v);
     if (intersects({ x: p.x - 3, y: 0, z: p.z - 3, w: 6, h: 0, d: 6 }, COMPOUND, 8)) continue;
@@ -284,8 +285,8 @@ export const TREES: Tree[] = (() => {
   const out: Tree[] = [];
   const main = TRACKS[0].points;
 
-  for (let i = 0; i < 50; i++) {
-    const t = (i / 49) * (main.length - 1);
+  for (let i = 0; i < 26; i++) {
+    const t = (i / 25) * (main.length - 1);
     const k = Math.min(main.length - 2, Math.floor(t));
     const f = t - k;
     const u = main[k].u + (main[k + 1].u - main[k].u) * f + rand(i, 7) * 26;
@@ -295,8 +296,8 @@ export const TREES: Tree[] = (() => {
     out.push({ x: p.x, z: p.z, r: 6.5 + rand(i, 9) * 4 });
   }
 
-  for (let i = 0; i < 26; i++) {
-    const p = fromScreen(-1150 + rand(i, 11) * 760, 520 + rand(i, 12) * 540);
+  for (let i = 0; i < 10; i++) {
+    const p = fromScreen(-1150 + rand(i, 11) * 700, 540 + rand(i, 12) * 420);
     out.push({ x: p.x, z: p.z, r: 6 + rand(i, 13) * 4.5 });
   }
   return out;

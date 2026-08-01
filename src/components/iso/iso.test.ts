@@ -250,12 +250,14 @@ describe('site context', () => {
     expect(new Set(areas.map((a) => Math.round(a / 1000))).size).toBe(areas.length);
   });
 
-  it('carries enough ground texture to read as continuous', () => {
-    expect(TUFTS.length).toBeGreaterThan(200);
-    // Density must fall off with distance, not be uniform.
-    const near = TUFTS.filter((t) => Math.hypot(t.x - 110, t.z - 25) < 400).length;
-    const far = TUFTS.filter((t) => Math.hypot(t.x - 110, t.z - 25) > 800).length;
-    expect(near / Math.max(1, far)).toBeGreaterThan(1);
+  it('keeps ground texture as a near-field band, not a wide scatter', () => {
+    // Spread across the whole terrain this read as noise on the lens rather than as ground.
+    // It is now a tight detail band around the compound, with the radial falloff handling
+    // distance instead.
+    expect(TUFTS.length).toBeGreaterThan(100);
+
+    const far = TUFTS.filter((t) => Math.hypot(t.x - 110, t.z - 25) > 900).length;
+    expect(far, 'texture should not extend into the far field').toBe(0);
   });
 
   it('runs the solar array off the frame rather than stopping inside it', () => {

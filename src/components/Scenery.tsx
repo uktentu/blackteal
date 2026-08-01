@@ -80,6 +80,27 @@ function SolarBlock({ rows, yaw, cls }: { rows: typeof SOLAR_ROWS; yaw: number; 
 export const Scenery = memo(function Scenery({ yaw }: { yaw: number }) {
   return (
     <g className="scn" aria-hidden="true" pointerEvents="none">
+      <defs>
+        {/* Panel glass: a cool sheen across the tilt, so a row reads as a surface catching
+            light rather than as a flat slab. */}
+        <linearGradient id="pvFace" x1="0" y1="0" x2="0.3" y2="1">
+          <stop offset="0%" stopColor="#3c5170" />
+          <stop offset="55%" stopColor="#2b3b53" />
+          <stop offset="100%" stopColor="#212f42" />
+        </linearGradient>
+        {/*
+          Atmospheric falloff, centred on the compound. Bright at the plant, sinking to the
+          page background at the edges — it focuses the eye, dissolves the terrain boundary,
+          and gives the flat ground plane depth, all in one element.
+        */}
+        <radialGradient id="siteFalloff" cx="50%" cy="50%" r="52%">
+          <stop offset="0%" stopColor="#0f1317" stopOpacity="0" />
+          <stop offset="30%" stopColor="#0f1317" stopOpacity="0.18" />
+          <stop offset="58%" stopColor="#0f1317" stopOpacity="0.62" />
+          <stop offset="100%" stopColor="#0f1317" stopOpacity="1" />
+        </radialGradient>
+      </defs>
+
       {/* ---- base terrain: one surface, no visible edge ---- */}
       <polygon
         className="scn-ground"

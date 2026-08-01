@@ -484,6 +484,18 @@ export function IsoScene({ site, selectedId, flashedId, stale, onSelect }: Props
         {/* ground */}
         <g className="iso-in" style={{ animationDelay: '0ms' }}>
           <Scenery yaw={yaw} />
+          {/* Painted over the landscape but under the plant: the compound must stay the
+              brightest thing on screen. */}
+          {/* Oversized by 30%: sized exactly to the view box it left a bright rim of raw
+              terrain at the frame edges wherever the panel aspect differed from the view's. */}
+          <rect
+            className="scn-falloff"
+            x={VIEW.x - VIEW.w * 0.3}
+            y={VIEW.y - VIEW.h * 0.3}
+            width={VIEW.w * 1.6}
+            height={VIEW.h * 1.6}
+            fill="url(#siteFalloff)"
+          />
         </g>
 
         <g className="iso-ground iso-in" style={{ animationDelay: '160ms' }}>
