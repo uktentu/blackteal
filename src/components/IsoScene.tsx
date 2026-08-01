@@ -44,6 +44,7 @@ import {
   SUB_RADS,
 } from './iso/layout';
 import { Scenery } from './Scenery';
+import { HALLS, NEAR_HALLS } from './iso/scenery';
 
 import './iso.css';
 import './scenery.css';
@@ -93,11 +94,24 @@ const GUTTER = { top: 46, bottom: 20 };
 const FRAME_ASPECT = 3.0;
 
 
+/**
+ * Highest point of anything drawn, not just the plant.
+ *
+ * The gutter was measured from the plant's slab alone. Once the campus grew into ranked rows,
+ * halls projected well above that line and rose straight into the annotation band, so labels
+ * were drawn on buildings again. Whatever stands tallest sets the ceiling.
+ */
+const CONTENT_TOP = Math.min(
+  SCENE.minY,
+  ...[...NEAR_HALLS, ...HALLS].flatMap((h) => boxCorners(h.box).map((p) => p.y)),
+);
+
 const VIEW = (() => {
-  const h = SCENE.maxY - SCENE.minY + GUTTER.top + GUTTER.bottom;
+  const top = CONTENT_TOP - GUTTER.top;
+  const h = SCENE.maxY - top + GUTTER.bottom;
   const w = h * FRAME_ASPECT;
   const cx = (SCENE.minX + SCENE.maxX) / 2;
-  return { x: cx - w / 2, y: SCENE.minY - GUTTER.top, w, h };
+  return { x: cx - w / 2, y: top, w, h };
 })();
 
 /**
@@ -468,6 +482,37 @@ export function IsoScene({ site, selectedId, flashedId, stale, onSelect }: Props
     [yaw],
   );
 
+  /**
+   * Label positions, spread so adjacent titles cannot collide.
+   *
+   * Each starts above its own asset, then any pair closer than MIN_LABEL_GAP is pushed apart
+   * symmetrically. The leader's elbow absorbs the offset, so a label can move without losing
+   * its connection to what it names.
+   */
+  const labelLayout = useMemo(() => {
+    const MIN_LABEL_GAP = 150;
+    const items = Object.entries(LABELS)
+      .map(([id, l]) => ({
+        id,
+        label: l.title,
+        sub: l.sub,
+        anchor: topCentre(ASSET_BOX[id], yaw),
+      }))
+      .sort((a, b) => a.anchor.x - b.anchor.x)
+      .map((it) => ({ ...it, textX: it.anchor.x }));
+
+    for (let pass = 0; pass < 4; pass++) {
+      for (let i = 0; i < items.length - 1; i++) {
+        const gap = items[i + 1].textX - items[i].textX;
+        if (gap >= MIN_LABEL_GAP) continue;
+        const push = (MIN_LABEL_GAP - gap) / 2;
+        items[i].textX -= push;
+        items[i + 1].textX += push;
+      }
+    }
+    return items;
+  }, [yaw]);
+
   const hovered = hoveredId !== null && hoveredId !== selectedId ? hoveredId : null;
 
   return (
@@ -557,17 +602,17 @@ export function IsoScene({ site, selectedId, flashedId, stale, onSelect }: Props
         ))}
 
         {/*
-          Annotations live in the TOP gutter, with vertical leaders down to their asset.
-          The data-centre label used to sit in the left gutter, but the neighbouring campus
-          halls stand outside the plant slab and project further left than it does, so a
-          left-anchored label ended up drawn on top of a building. Above the scene there is
-          nothing to collide with.
+          Annotations live in the top gutter with elbowed leaders: down from the label, across
+          within the gutter, then straight down to the asset.
+          The horizontal run stays above every structure, so a leader can never cut through a
+          building on its way — which a direct diagonal would, now that the campus stands
+          between the labels and the plant.
+          Labels are also spread apart: the three assets sit close together on screen, so
+          anchoring each directly over its own asset bunched the text into an unreadable
+          cluster.
         */}
-        {Object.entries(LABELS).map(([id, l]) => {
-          const c = topCentre(ASSET_BOX[id], yaw);
-          const lx = c.x;
-          const ly = VIEW.y + 22;
-
+        {labelLayout.map(({ id, label, sub, textX, anchor }) => {
+          const top = VIEW.y + 22;
           return (
             <g
               key={id}
@@ -575,17 +620,17 @@ export function IsoScene({ site, selectedId, flashedId, stale, onSelect }: Props
               aria-hidden="true"
               style={{ animationDelay: '1320ms' }}
             >
-              <text className="iso-label-title" x={lx} y={ly} textAnchor="middle">
-                {l.title}
+              <text className="iso-label-title" x={textX} y={top} textAnchor="middle">
+                {label}
               </text>
-              <text className="iso-label-sub" x={lx} y={ly + 14} textAnchor="middle">
-                {l.sub}
+              <text className="iso-label-sub" x={textX} y={top + 14} textAnchor="middle">
+                {sub}
               </text>
               <path
                 className="iso-leader"
-                d={`M${lx.toFixed(1)} ${(ly + 22).toFixed(1)} V${(c.y - 16).toFixed(1)}`}
+                d={`M${textX.toFixed(1)} ${(top + 22).toFixed(1)} V${(top + 30).toFixed(1)} H${anchor.x.toFixed(1)} V${(anchor.y - 16).toFixed(1)}`}
               />
-              <circle className="iso-leader-dot" cx={lx} cy={c.y - 16} r={2.4} />
+              <circle className="iso-leader-dot" cx={anchor.x} cy={anchor.y - 16} r={2.4} />
             </g>
           );
         })}

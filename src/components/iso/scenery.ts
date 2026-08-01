@@ -57,24 +57,11 @@ function plot(u: number, v: number, w: number, d: number, y = 0, h = 0): Box {
 }
 
 /**
- * Place by world coordinates rather than screen position.
- *
- * "Next to the data centre" is a relationship in world space — a neighbouring hall shares its
- * z band and sits a little further along x. Expressed in screen coordinates that becomes a
- * diagonal offset that is easy to get wrong, and my first attempt put the campus halls off at
- * the frame edge instead of alongside the building they belong to.
- */
-function plotWorld(x: number, z: number, w: number, d: number, h = 0): Box {
-  return { x, y: 0, z, w, h, d };
-}
-
-/**
  * Everything already standing, so later placements can avoid it.
  *
- * Buildings were previously hand-listed by coordinate and only checked against the compound.
- * The result was a hall on the plant itself, one hall inside a barn, two buildings in the
- * middle of the solar array and three straddling the access road. Placement now rejects
- * against every prior claim, and the tests assert it stays that way.
+ * Placement was once hand-listed by coordinate and only checked against the compound, which
+ * produced a hall on the plant itself, one inside a barn, two in the solar array and three
+ * straddling the access road. Every claim now goes through here.
  */
 const CLAIMED: Box[] = [];
 
@@ -333,23 +320,35 @@ export interface Hall {
  * outbuildings, and set just clear of the compound edge so they sit next to the plant without
  * standing on it.
  */
-const NEAR_HALL_SPEC: [x: number, z: number, w: number, d: number, h: number][] = [
-  // Directly alongside the main hall, sharing its depth band and as close as the compound
-  // edge allows — a campus row, not distant neighbours.
-  //
-  // All are kept smaller than the data centre itself (64 x 52 x 36). Sized to match, three of
-  // them projected LARGER on screen than the asset they are meant to sit beside, which
-  // inverts the hierarchy: the dummy buildings outranked the real one.
-  [-196, -6, 52, 44, 28],
-  [-196, 62, 52, 40, 24],
-  // Set back and forward so the group reads as a campus rather than a wall. Held to the right
-  // of the label gutter — further left they collided with the "Data Center" annotation.
-  [-248, -104, 54, 42, 26],
-  [-248, 122, 54, 42, 25],
-];
+/**
+ * The data-centre farm alongside the main hall.
+ *
+ * Laid out on the SCREEN grid, not the world grid. Stepping the ranks along world -x marched
+ * them up and to the left, so the campus climbed above the plant and forced the whole view to
+ * zoom out to contain it — the halls got bigger and the asset everyone is actually watching
+ * got smaller. Holding a constant screen-v and varying screen-u keeps every rank at the same
+ * height as the data centre, so the farm spreads sideways instead of upwards.
+ *
+ * All are smaller than the data centre (64 x 52 x 36), and shrink with distance so the rows
+ * read as depth.
+ */
+const NEAR_HALL_SPEC: [u: number, v: number, w: number, d: number, h: number][] = (() => {
+  const out: [number, number, number, number, number][] = [];
+  for (let col = 0; col < 4; col++) {
+    for (let row = 0; row < 3; row++) {
+      const u = -250 - col * 118;
+      const v = -70 + row * 92;
+      const w = 50 - col * 3;
+      const d = 42 - col * 3;
+      const h = 27 - col * 2;
+      out.push([u, v, w, d, h]);
+    }
+  }
+  return out;
+})();
 
-export const NEAR_HALLS: Hall[] = NEAR_HALL_SPEC.flatMap(([x, z, w, d, h]) => {
-  const box = claim(plotWorld(x, z, w, d, h), 16);
+export const NEAR_HALLS: Hall[] = NEAR_HALL_SPEC.flatMap(([u, v, w, d, h]) => {
+  const box = claim(plot(u, v, w, d, 0, h), 14);
   if (box === null) return [];
   const plant: Box[] = [];
   for (let i = 0; i < 3; i++) {
