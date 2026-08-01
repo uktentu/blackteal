@@ -57,6 +57,18 @@ function plot(u: number, v: number, w: number, d: number, y = 0, h = 0): Box {
 }
 
 /**
+ * Place by world coordinates rather than screen position.
+ *
+ * "Next to the data centre" is a relationship in world space — a neighbouring hall shares its
+ * z band and sits a little further along x. Expressed in screen coordinates that becomes a
+ * diagonal offset that is easy to get wrong, and my first attempt put the campus halls off at
+ * the frame edge instead of alongside the building they belong to.
+ */
+function plotWorld(x: number, z: number, w: number, d: number, h = 0): Box {
+  return { x, y: 0, z, w, h, d };
+}
+
+/**
  * Everything already standing, so later placements can avoid it.
  *
  * Buildings were previously hand-listed by coordinate and only checked against the compound.
@@ -314,15 +326,26 @@ export interface Hall {
  * read as the same site as the main hall, and are rendered a tier brighter than the outlying
  * halls so the scene has depth: plant, then near campus, then distant context.
  */
-const NEAR_HALL_SPEC: [u: number, v: number, w: number, d: number, h: number][] = [
-  [-268, -130, 76, 52, 28],
-  [-300, 20, 70, 48, 25],
-  [-190, -232, 72, 50, 26],
-  [-402, -78, 66, 46, 24],
+/**
+ * World-space positions, alongside the data-centre hall at x -98..-34, z -4..48.
+ *
+ * Sized close to the main building so they read as sibling halls on one campus rather than as
+ * outbuildings, and set just clear of the compound edge so they sit next to the plant without
+ * standing on it.
+ */
+const NEAR_HALL_SPEC: [x: number, z: number, w: number, d: number, h: number][] = [
+  // Directly alongside the main hall, sharing its depth band and as close as the compound
+  // edge allows — a campus row, not distant neighbours.
+  [-200, -8, 60, 52, 33],
+  [-200, 64, 60, 46, 29],
+  // One set back and one forward, so the group reads as a campus rather than a wall.
+  [-290, -108, 62, 48, 31],
+  [-290, 126, 62, 48, 30],
+  [-300, 10, 56, 44, 27],
 ];
 
-export const NEAR_HALLS: Hall[] = NEAR_HALL_SPEC.flatMap(([u, v, w, d, h]) => {
-  const box = claim(plot(u, v, w, d, 0, h), 20);
+export const NEAR_HALLS: Hall[] = NEAR_HALL_SPEC.flatMap(([x, z, w, d, h]) => {
+  const box = claim(plotWorld(x, z, w, d, h), 16);
   if (box === null) return [];
   const plant: Box[] = [];
   for (let i = 0; i < 3; i++) {
