@@ -92,6 +92,7 @@ const GUTTER = { top: 46, bottom: 20 };
  */
 const FRAME_ASPECT = 3.0;
 
+
 const VIEW = (() => {
   const h = SCENE.maxY - SCENE.minY + GUTTER.top + GUTTER.bottom;
   const w = h * FRAME_ASPECT;
@@ -556,18 +557,16 @@ export function IsoScene({ site, selectedId, flashedId, stale, onSelect }: Props
         ))}
 
         {/*
-          Leader-line labels, anchored in the gutters so they can never overlap the model.
-          Each runs horizontally out to the gutter, then to the asset — the elbow keeps the
-          leader from cutting diagonally across the site.
+          Annotations live in the TOP gutter, with vertical leaders down to their asset.
+          The data-centre label used to sit in the left gutter, but the neighbouring campus
+          halls stand outside the plant slab and project further left than it does, so a
+          left-anchored label ended up drawn on top of a building. Above the scene there is
+          nothing to collide with.
         */}
         {Object.entries(LABELS).map(([id, l]) => {
           const c = topCentre(ASSET_BOX[id], yaw);
-          const left = id === 'LOAD';
-          const anchorX = left ? SCENE.minX - 18 : SCENE.maxX + 18;
-          // Clamped into the gutter: deriving the height purely from the asset pushed the
-          // data-centre annotation above the viewBox, where the viewport clipped it.
-          const anchorY = Math.max(VIEW.y + 30, c.y - (left ? 58 : 32));
-          const elbowX = left ? anchorX + 34 : anchorX - 34;
+          const lx = c.x;
+          const ly = VIEW.y + 22;
 
           return (
             <g
@@ -576,27 +575,17 @@ export function IsoScene({ site, selectedId, flashedId, stale, onSelect }: Props
               aria-hidden="true"
               style={{ animationDelay: '1320ms' }}
             >
-              <path
-                className="iso-leader"
-                d={`M${anchorX.toFixed(1)} ${anchorY.toFixed(1)} H${elbowX.toFixed(1)} L${c.x.toFixed(1)} ${(c.y - 15).toFixed(1)}`}
-              />
-              <circle className="iso-leader-dot" cx={c.x} cy={c.y - 15} r={2.4} />
-              <text
-                className="iso-label-title"
-                x={anchorX}
-                y={anchorY - 5}
-                textAnchor={left ? 'end' : 'start'}
-              >
+              <text className="iso-label-title" x={lx} y={ly} textAnchor="middle">
                 {l.title}
               </text>
-              <text
-                className="iso-label-sub"
-                x={anchorX}
-                y={anchorY + 9}
-                textAnchor={left ? 'end' : 'start'}
-              >
+              <text className="iso-label-sub" x={lx} y={ly + 14} textAnchor="middle">
                 {l.sub}
               </text>
+              <path
+                className="iso-leader"
+                d={`M${lx.toFixed(1)} ${(ly + 22).toFixed(1)} V${(c.y - 16).toFixed(1)}`}
+              />
+              <circle className="iso-leader-dot" cx={lx} cy={c.y - 16} r={2.4} />
             </g>
           );
         })}

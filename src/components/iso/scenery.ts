@@ -336,12 +336,16 @@ export interface Hall {
 const NEAR_HALL_SPEC: [x: number, z: number, w: number, d: number, h: number][] = [
   // Directly alongside the main hall, sharing its depth band and as close as the compound
   // edge allows — a campus row, not distant neighbours.
-  [-200, -8, 60, 52, 33],
-  [-200, 64, 60, 46, 29],
-  // One set back and one forward, so the group reads as a campus rather than a wall.
-  [-290, -108, 62, 48, 31],
-  [-290, 126, 62, 48, 30],
-  [-300, 10, 56, 44, 27],
+  //
+  // All are kept smaller than the data centre itself (64 x 52 x 36). Sized to match, three of
+  // them projected LARGER on screen than the asset they are meant to sit beside, which
+  // inverts the hierarchy: the dummy buildings outranked the real one.
+  [-196, -6, 52, 44, 28],
+  [-196, 62, 52, 40, 24],
+  // Set back and forward so the group reads as a campus rather than a wall. Held to the right
+  // of the label gutter — further left they collided with the "Data Center" annotation.
+  [-248, -104, 54, 42, 26],
+  [-248, 122, 54, 42, 25],
 ];
 
 export const NEAR_HALLS: Hall[] = NEAR_HALL_SPEC.flatMap(([x, z, w, d, h]) => {
@@ -369,18 +373,25 @@ export const NEAR_HALLS: Hall[] = NEAR_HALL_SPEC.flatMap(([x, z, w, d, h]) => {
  * what give the plant its sense of scale. Deliberately muted and detail-light: they read as
  * buildings at a distance, and nothing about them should invite a click.
  */
+/**
+ * Outlying halls, set back beyond the near campus.
+ *
+ * Every one is smaller than the data centre (64 x 52) — and smaller than the near campus too,
+ * so footprint reads as distance. At their original size they projected larger on screen than
+ * the asset they were meant to sit behind.
+ */
 const HALL_SPEC: [u: number, v: number, w: number, d: number, h: number][] = [
-  // Left flank, set back beyond the near campus.
-  [-500, -210, 90, 60, 30],
-  [-520, 96, 82, 56, 28],
-  [-470, 232, 78, 54, 26],
+  // Left flank.
+  [-500, -210, 56, 44, 25],
+  [-520, 96, 52, 42, 23],
+  [-470, 232, 50, 40, 21],
   // Bottom-right, balancing the solar block.
-  [560, 330, 88, 60, 29],
-  [664, 176, 76, 52, 26],
-  [432, 414, 80, 56, 27],
+  [560, 330, 56, 44, 24],
+  [664, 176, 50, 40, 22],
+  [432, 414, 52, 42, 23],
   // Cut by the frame, so the campus reads as continuing past it.
-  [700, -170, 82, 56, 27],
-  [-560, 380, 84, 56, 27],
+  [700, -170, 54, 42, 23],
+  [-560, 380, 52, 42, 22],
 ];
 
 export const HALLS: Hall[] = HALL_SPEC.flatMap(([u, v, w, d, h]) => {

@@ -42,6 +42,7 @@ import {
   TREES,
   TUFTS,
   TURBINES,
+  NEAR_HALLS,
   VIEW_U,
   VIEW_V,
   fromScreen,
@@ -356,5 +357,27 @@ describe('site context', () => {
     expect(TUFTS[0]).toEqual(TUFTS[0]);
     expect(TREES.every((t) => Number.isFinite(t.x) && Number.isFinite(t.z))).toBe(true);
     expect(TURBINES.every((t) => Number.isFinite(t.x))).toBe(true);
+  });
+});
+
+describe('annotation clearance', () => {
+  it('keeps every campus hall below the annotation band', () => {
+    // Annotations sit in the top gutter with vertical leaders. A hall reaching above the
+    // plant's own skyline would rise into that band and sit under the text.
+    const plantTop = Math.min(...boxCorners(GROUND).map((p) => p.y));
+
+    for (const [i, h] of [...NEAR_HALLS, ...HALLS].entries()) {
+      const top = Math.min(...boxCorners(h.box).map((p) => p.y));
+      expect(top, `hall ${i} rises into the annotation band`).toBeGreaterThan(plantTop - 150);
+    }
+  });
+
+  it('keeps every neighbouring hall smaller than the data centre', () => {
+    // Sized to match, several projected larger on screen than the asset they sit beside,
+    // which inverts the hierarchy the whole view depends on.
+    const dc = LOAD_BOX.w * LOAD_BOX.d;
+    for (const [i, h] of [...NEAR_HALLS, ...HALLS].entries()) {
+      expect(h.box.w * h.box.d, `hall ${i} is not smaller than the data centre`).toBeLessThan(dc);
+    }
   });
 });
