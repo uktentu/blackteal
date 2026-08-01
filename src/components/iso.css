@@ -259,6 +259,21 @@
   fill: var(--bt-text-muted);
 }
 
+/**
+ * Labels sit just above their own asset, which means they land on structures rather than on
+ * empty gutter. A dark halo drawn behind the glyphs keeps them legible over concrete, roof or
+ * sky without a filled plate obscuring the scene beneath — `paint-order` puts the stroke down
+ * first so it never eats into the letterforms.
+ */
+.iso-label-title,
+.iso-label-sub {
+  paint-order: stroke fill;
+  stroke: #0f1317;
+  stroke-opacity: 0.88;
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
 .iso-label-title {
   font-size: 11px;
   font-weight: 600;

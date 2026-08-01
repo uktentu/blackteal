@@ -44,7 +44,7 @@ import {
   SUB_RADS,
 } from './iso/layout';
 import { Scenery } from './Scenery';
-import { HALLS, NEAR_HALLS } from './iso/scenery';
+
 
 import './iso.css';
 import './scenery.css';
@@ -95,19 +95,16 @@ const FRAME_ASPECT = 3.0;
 
 
 /**
- * Highest point of anything drawn, not just the plant.
+ * The frame is fitted to the PLANT, not to everything drawn.
  *
- * The gutter was measured from the plant's slab alone. Once the campus grew into ranked rows,
- * halls projected well above that line and rose straight into the annotation band, so labels
- * were drawn on buildings again. Whatever stands tallest sets the ceiling.
+ * Sizing it to clear the tallest structure pushed the ceiling far above the compound, which
+ * left a dead band across the top and stretched the annotation leaders to 246px in a 443px
+ * panel — long dangling lines over empty ground. Background scenery that rises past the top
+ * edge is simply cut by it, which is what "the site continues beyond the frame" should look
+ * like anyway.
  */
-const CONTENT_TOP = Math.min(
-  SCENE.minY,
-  ...[...NEAR_HALLS, ...HALLS].flatMap((h) => boxCorners(h.box).map((p) => p.y)),
-);
-
 const VIEW = (() => {
-  const top = CONTENT_TOP - GUTTER.top;
+  const top = SCENE.minY - GUTTER.top;
   const h = SCENE.maxY - top + GUTTER.bottom;
   const w = h * FRAME_ASPECT;
   const cx = (SCENE.minX + SCENE.maxX) / 2;
@@ -163,6 +160,15 @@ function useIntro(active: boolean) {
   return { t, yaw: INTRO_YAW * (1 - easeOut(t)), done: t >= 1 };
 }
 const SKID_LABEL_X = SKID_LABEL_ANCHOR.x;
+
+/**
+ * A longer hop than the other labels use.
+ *
+ * The skid block carries six "+" affordances packed tightly together, and at the standard 44px
+ * the sub-line ran straight through one of them — an orange marker reading as part of the
+ * text. This clears the whole row.
+ */
+const SKID_LABEL_TOP = SKID_LABEL_ANCHOR.y - 62;
 
 /** A solid, shaded box. Three faces only — the other three never face this camera. */
 function Solid({
@@ -483,31 +489,37 @@ export function IsoScene({ site, selectedId, flashedId, stale, onSelect }: Props
   );
 
   /**
-   * Label positions, spread so adjacent titles cannot collide.
+   * Label positions: each sits just above the asset it names.
    *
-   * Each starts above its own asset, then any pair closer than MIN_LABEL_GAP is pushed apart
-   * symmetrically. The leader's elbow absorbs the offset, so a label can move without losing
-   * its connection to what it names.
+   * Parking every label in a band at the top of the frame meant leaders had to reach all the
+   * way down to assets scattered through the scene — 208px of thin diagonal line across empty
+   * ground in a 443px panel, which read as loose wires rather than as annotation. A label a
+   * short hop above its own subject needs no explaining.
+   *
+   * Pairs are pushed apart horizontally only when they genuinely collide: close in x AND close
+   * in y. Two labels 150px apart vertically do not need spreading, and spreading them anyway is
+   * what dragged text away from its asset in the first place.
    */
   const labelLayout = useMemo(() => {
-    const MIN_LABEL_GAP = 150;
+    const MIN_X_GAP = 132;
+    const MIN_Y_GAP = 30;
     const items = Object.entries(LABELS)
-      .map(([id, l]) => ({
-        id,
-        label: l.title,
-        sub: l.sub,
-        anchor: topCentre(ASSET_BOX[id], yaw),
-      }))
-      .sort((a, b) => a.anchor.x - b.anchor.x)
-      .map((it) => ({ ...it, textX: it.anchor.x }));
+      .map(([id, l]) => {
+        const anchor = topCentre(ASSET_BOX[id], yaw);
+        return { id, label: l.title, sub: l.sub, anchor, textX: anchor.x, textY: anchor.y - 44 };
+      })
+      .sort((a, b) => a.anchor.x - b.anchor.x);
 
     for (let pass = 0; pass < 4; pass++) {
       for (let i = 0; i < items.length - 1; i++) {
-        const gap = items[i + 1].textX - items[i].textX;
-        if (gap >= MIN_LABEL_GAP) continue;
-        const push = (MIN_LABEL_GAP - gap) / 2;
-        items[i].textX -= push;
-        items[i + 1].textX += push;
+        const a = items[i];
+        const b = items[i + 1];
+        if (Math.abs(a.textY - b.textY) >= MIN_Y_GAP) continue;
+        const gap = b.textX - a.textX;
+        if (gap >= MIN_X_GAP) continue;
+        const push = (MIN_X_GAP - gap) / 2;
+        a.textX -= push;
+        b.textX += push;
       }
     }
     return items;
@@ -606,13 +618,11 @@ export function IsoScene({ site, selectedId, flashedId, stale, onSelect }: Props
           within the gutter, then straight down to the asset.
           The horizontal run stays above every structure, so a leader can never cut through a
           building on its way — which a direct diagonal would, now that the campus stands
-          between the labels and the plant.
-          Labels are also spread apart: the three assets sit close together on screen, so
-          anchoring each directly over its own asset bunched the text into an unreadable
-          cluster.
+          between the labels and the plant. The elbow only has to absorb the small sideways
+          offset applied when two labels would otherwise overlap.
         */}
-        {labelLayout.map(({ id, label, sub, textX, anchor }) => {
-          const top = VIEW.y + 22;
+        {labelLayout.map(({ id, label, sub, textX, textY, anchor }) => {
+          const top = textY;
           return (
             <g
               key={id}
@@ -628,26 +638,26 @@ export function IsoScene({ site, selectedId, flashedId, stale, onSelect }: Props
               </text>
               <path
                 className="iso-leader"
-                d={`M${textX.toFixed(1)} ${(top + 22).toFixed(1)} V${(top + 30).toFixed(1)} H${anchor.x.toFixed(1)} V${(anchor.y - 16).toFixed(1)}`}
+                d={`M${textX.toFixed(1)} ${(top + 19).toFixed(1)} V${(top + 25).toFixed(1)} H${anchor.x.toFixed(1)} V${(anchor.y - 14).toFixed(1)}`}
               />
-              <circle className="iso-leader-dot" cx={anchor.x} cy={anchor.y - 16} r={2.4} />
+              <circle className="iso-leader-dot" cx={anchor.x} cy={anchor.y - 14} r={2.4} />
             </g>
           );
         })}
 
-        {/* Skid group label, centred over the two rows in the top gutter. */}
+        {/* Skid group label — same short hop above its own subject as the rest. */}
         <g className="iso-label iso-in" aria-hidden="true" style={{ animationDelay: '1320ms' }}>
-          <text className="iso-label-title" x={SKID_LABEL_X} y={VIEW.y + 22} textAnchor="middle">
+          <text className="iso-label-title" x={SKID_LABEL_X} y={SKID_LABEL_TOP} textAnchor="middle">
             BESS Skids
           </text>
-          <text className="iso-label-sub" x={SKID_LABEL_X} y={VIEW.y + 36} textAnchor="middle">
+          <text className="iso-label-sub" x={SKID_LABEL_X} y={SKID_LABEL_TOP + 13} textAnchor="middle">
             6 × 2.5 MW / 10 MWh
           </text>
           <path
             className="iso-leader"
-            d={`M${SKID_LABEL_X} ${VIEW.y + 44} V${(SKID_LABEL_ANCHOR.y - 16).toFixed(1)}`}
+            d={`M${SKID_LABEL_X} ${(SKID_LABEL_TOP + 19).toFixed(1)} V${(SKID_LABEL_ANCHOR.y - 14).toFixed(1)}`}
           />
-          <circle className="iso-leader-dot" cx={SKID_LABEL_X} cy={SKID_LABEL_ANCHOR.y - 16} r={2.4} />
+          <circle className="iso-leader-dot" cx={SKID_LABEL_X} cy={SKID_LABEL_ANCHOR.y - 14} r={2.4} />
         </g>
       </svg>
 
