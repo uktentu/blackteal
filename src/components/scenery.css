@@ -147,3 +147,37 @@
   stroke-dasharray: 6 5;
   opacity: 0.7;
 }
+
+/* ---- neighbouring campus halls ----
+   Muted and detail-light: they read as buildings at a distance, and nothing about them should
+   invite a click. Kept a full step below the plant's concrete so the compound still leads. */
+
+.scn-hall-top {
+  fill: #3f4956;
+  stroke: #4a5563;
+  stroke-width: 0.5;
+}
+.scn-hall-right {
+  fill: #2b333d;
+  stroke: #363f4a;
+  stroke-width: 0.5;
+}
+.scn-hall-left {
+  fill: #1e242c;
+  stroke: #2a313a;
+  stroke-width: 0.5;
+}
+
+/* ---- silos ---- */
+
+.scn-silo-body {
+  fill: #39434e;
+  stroke: #454f5c;
+  stroke-width: 0.5;
+}
+
+.scn-silo-cap {
+  fill: #4b5665;
+  stroke: #545f6e;
+  stroke-width: 0.5;
+}

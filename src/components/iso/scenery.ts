@@ -33,6 +33,17 @@ export const COMPOUND: Box = { x: -110, y: 0, z: -30, w: 440, h: 1, d: 110 };
 export const LAND_U = { min: -4000, max: 4200 };
 export const LAND_V = { min: -3000, max: 3400 };
 
+/**
+ * The window the camera can actually see, measured from the rendered view box.
+ *
+ * Scenery placed outside this is simply invisible, which is how an earlier pass ended up with
+ * a village, three barns and four silos that nobody could ever see. Every placement below is
+ * expressed against these bounds, with a deliberate overspill so structures are cut by the
+ * frame rather than stopping neatly inside it.
+ */
+export const VIEW_U = { min: -529, max: 689 };
+export const VIEW_V = { min: -266, max: 437 };
+
 export const LAND_CORNERS = [
   fromScreen(LAND_U.min, LAND_V.min),
   fromScreen(LAND_U.max, LAND_V.min),
@@ -154,12 +165,12 @@ export const TUFTS: Tuft[] = (() => {
   // larger than the frame, and spreading a fixed budget over all of it would leave the
   // visible area bare.
   for (let i = 0; i < 900; i++) {
-    const u = 90 + (rand(i, 1) - 0.5) * 1500;
-    const v = 140 + (rand(i, 2) - 0.5) * 900;
+    const u = 80 + (rand(i, 1) - 0.5) * 1400;
+    const v = 90 + (rand(i, 2) - 0.5) * 820;
 
-    // A tight detail band near the plant only. Spread wide it reads as noise, not ground.
-    const d = Math.hypot(u - 90, (v - 140) * 1.7);
-    if (d > 620 || rand(i, 3) > 0.5) continue;
+    // A detail band across the visible ground. Spread wider it reads as noise, not terrain.
+    const d = Math.hypot(u - 80, (v - 90) * 1.6);
+    if (d > 660 || rand(i, 3) > 0.55) continue;
 
     const p = fromScreen(u, v);
     if (intersects({ x: p.x - 3, y: 0, z: p.z - 3, w: 6, h: 0, d: 6 }, COMPOUND, 8)) continue;
@@ -183,9 +194,9 @@ export const PANEL = { depth: 12, height: 8 };
  */
 export const SOLAR_ROWS: Box[] = (() => {
   const out: Box[] = [];
-  for (let col = 0; col < 16; col++) {
-    for (let row = 0; row < 18; row++) {
-      const b = plot(400 + col * 74, -560 + row * 46, 62, PANEL.depth);
+  for (let col = 0; col < 10; col++) {
+    for (let row = 0; row < 12; row++) {
+      const b = plot(390 + col * 74, -300 + row * 46, 62, PANEL.depth);
       if (intersects(b, COMPOUND, 24)) continue;
       out.push(b);
     }
@@ -196,9 +207,10 @@ export const SOLAR_ROWS: Box[] = (() => {
 /** A second array further out, catching the far edge of the frame. */
 export const SOLAR_FAR: Box[] = (() => {
   const out: Box[] = [];
-  for (let col = 0; col < 8; col++) {
-    for (let row = 0; row < 10; row++) {
-      out.push(plot(-1400 + col * 72, -820 + row * 44, 58, PANEL.depth));
+  // A second array on the far side, cut by the top edge of the frame.
+  for (let col = 0; col < 7; col++) {
+    for (let row = 0; row < 5; row++) {
+      out.push(plot(-560 + col * 72, -400 + row * 44, 58, PANEL.depth));
     }
   }
   return out;
@@ -247,15 +259,16 @@ export interface House {
 }
 
 const HOUSE_SPEC: [u: number, v: number, w: number, d: number, h: number, roof: number][] = [
-  [-760, 500, 30, 24, 16, 12],
-  [-700, 540, 24, 20, 13, 10],
-  [-716, 454, 26, 22, 15, 11],
-  [-640, 506, 30, 24, 17, 13],
-  [-648, 576, 24, 20, 13, 10],
-  [-576, 542, 26, 22, 15, 11],
-  [-580, 470, 22, 18, 12, 9],
-  [-512, 570, 28, 22, 16, 12],
-  [-512, 482, 24, 20, 14, 10],
+  [-470, 300, 28, 22, 15, 11],
+  [-418, 330, 22, 20, 13, 10],
+  [-436, 262, 24, 20, 14, 10],
+  [-360, 306, 30, 24, 16, 12],
+  [-366, 372, 22, 18, 12, 9],
+  [-300, 340, 26, 22, 15, 11],
+  [-306, 274, 20, 18, 12, 9],
+  [-240, 366, 28, 22, 16, 12],
+  [-236, 296, 24, 20, 14, 10],
+  [-160, 388, 22, 18, 12, 9],
 ];
 
 export const HOUSES: House[] = HOUSE_SPEC.map(([u, v, w, d, h, roof]) => ({
@@ -268,10 +281,9 @@ export const HOUSES: House[] = HOUSE_SPEC.map(([u, v, w, d, h, roof]) => ({
 // ---------------------------------------------------------------------------
 
 export const TURBINES = [
-  { ...fromScreen(-300, -620), h: 96, r: 30 },
-  { ...fromScreen(-90, -700), h: 112, r: 36 },
-  { ...fromScreen(140, -640), h: 88, r: 27 },
-  { ...fromScreen(-500, -540), h: 80, r: 25 },
+  { ...fromScreen(-140, -250), h: 88, r: 28 },
+  { ...fromScreen(60, -290), h: 102, r: 33 },
+  { ...fromScreen(250, -255), h: 80, r: 25 },
 ];
 
 export interface Tree {
@@ -305,3 +317,82 @@ export const TREES: Tree[] = (() => {
 
 /** Compound boundary fence, in screen-aligned units. */
 export const FENCE = { u: -230, v: -60, du: 580, dv: 280 };
+
+// ---------------------------------------------------------------------------
+// Neighbouring data-centre campus
+// ---------------------------------------------------------------------------
+
+export interface Hall {
+  box: Box;
+  /** Rooftop plant units. */
+  plant: Box[];
+}
+
+/**
+ * Other halls on the campus.
+ *
+ * A 38 MW facility is rarely alone — sites like this are campuses, and neighbouring halls are
+ * what give the plant its sense of scale. Deliberately muted and detail-light: they read as
+ * buildings at a distance, and nothing about them should invite a click.
+ */
+const HALL_SPEC: [u: number, v: number, w: number, d: number, h: number][] = [
+  // Left flank, where the frame was emptiest.
+  [-470, -180, 92, 62, 30],
+  [-360, -60, 78, 54, 26],
+  [-500, 60, 84, 58, 28],
+  [-250, -230, 74, 52, 25],
+  // Bottom-right, balancing the solar block.
+  [560, 330, 88, 60, 29],
+  [660, 170, 76, 52, 26],
+  [430, 410, 80, 56, 27],
+  // Far side, cut by the frame so the campus reads as continuing.
+  [-560, 260, 86, 58, 28],
+  [700, -180, 82, 56, 27],
+];
+
+export const HALLS: Hall[] = HALL_SPEC.map(([u, v, w, d, h]) => {
+  const box = plot(u, v, w, d, 0, h);
+  const plant: Box[] = [];
+  // Rooftop chillers in a neat row, as on the real thing.
+  for (let i = 0; i < 4; i++) {
+    plant.push({
+      x: box.x + 8 + i * ((box.w - 16) / 4),
+      y: h,
+      z: box.z + box.d * 0.3,
+      w: 9,
+      h: 4,
+      d: 9,
+    });
+  }
+  return { box, plant };
+});
+
+// ---------------------------------------------------------------------------
+// Farm structures
+// ---------------------------------------------------------------------------
+
+export interface Silo {
+  x: number;
+  z: number;
+  r: number;
+  h: number;
+}
+
+/** Grain silos beside the village — vertical accents in an otherwise flat middle distance. */
+export const SILOS: Silo[] = [
+  { ...fromScreen(-470, 396), r: 9, h: 32 },
+  { ...fromScreen(-446, 418), r: 9, h: 28 },
+  { ...fromScreen(-422, 396), r: 8, h: 24 },
+  { ...fromScreen(120, 400), r: 9, h: 30 },
+  { ...fromScreen(146, 420), r: 8, h: 26 },
+];
+
+/** Barns: bigger pitched-roof sheds, distinct from the houses. */
+export const BARNS: House[] = (
+  [
+    [-520, 360, 52, 34, 16, 14],
+    [-540, 200, 44, 30, 14, 12],
+    [-40, 400, 50, 32, 15, 13],
+    [260, 396, 46, 30, 14, 12],
+  ] as [number, number, number, number, number, number][]
+).map(([u, v, w, d, h, roof]) => ({ box: plot(u, v, w, d, 0, h), roof }));

@@ -12,12 +12,15 @@
 import { memo } from 'react';
 import { boxFaces, polygon, project, quad } from './iso/iso';
 import {
+  BARNS,
   FENCE,
   fromScreen,
+  HALLS,
   HOUSES,
   LAND_CORNERS,
   MEADOWS,
   PANEL,
+  SILOS,
   SOLAR_FAR,
   SOLAR_ROWS,
   TRACKS,
@@ -93,11 +96,16 @@ export const Scenery = memo(function Scenery({ yaw }: { yaw: number }) {
           page background at the edges — it focuses the eye, dissolves the terrain boundary,
           and gives the flat ground plane depth, all in one element.
         */}
-        <radialGradient id="siteFalloff" cx="50%" cy="50%" r="52%">
+        {/*
+          Atmospheric falloff. Held well short of opaque at the rim: pushed to full strength it
+          erased the very scenery it exists to sit behind, leaving the frame emptier than
+          before. Depth, not a mask.
+        */}
+        <radialGradient id="siteFalloff" cx="50%" cy="50%" r="62%">
           <stop offset="0%" stopColor="#0f1317" stopOpacity="0" />
-          <stop offset="30%" stopColor="#0f1317" stopOpacity="0.18" />
-          <stop offset="58%" stopColor="#0f1317" stopOpacity="0.62" />
-          <stop offset="100%" stopColor="#0f1317" stopOpacity="1" />
+          <stop offset="40%" stopColor="#0f1317" stopOpacity="0.12" />
+          <stop offset="70%" stopColor="#0f1317" stopOpacity="0.42" />
+          <stop offset="100%" stopColor="#0f1317" stopOpacity="0.82" />
         </radialGradient>
       </defs>
 
@@ -142,8 +150,34 @@ export const Scenery = memo(function Scenery({ yaw }: { yaw: number }) {
       <SolarBlock rows={SOLAR_FAR} yaw={yaw} cls="scn-solar scn-solar-far" />
       <SolarBlock rows={SOLAR_ROWS} yaw={yaw} cls="scn-solar" />
 
-      {/* ---- village ---- */}
-      {HOUSES.map((h, i) => {
+      {/* ---- neighbouring campus halls: flat-roofed, with rooftop plant ---- */}
+      {HALLS.map((h, i) => {
+        const f = boxFaces(h.box, yaw);
+        return (
+          <g key={`hall${i}`} className="scn-hall">
+            <polygon
+              className="scn-shadow"
+              points={quad(h.box.x + 3, 0.03, h.box.z + 3, h.box.w, h.box.d, yaw)}
+            />
+            <polygon className="scn-hall-left" points={f.left} />
+            <polygon className="scn-hall-right" points={f.right} />
+            <polygon className="scn-hall-top" points={f.top} />
+            {h.plant.map((p, k) => {
+              const pf = boxFaces(p, yaw);
+              return (
+                <g key={k}>
+                  <polygon className="scn-hall-left" points={pf.left} />
+                  <polygon className="scn-hall-right" points={pf.right} />
+                  <polygon className="scn-hall-top" points={pf.top} />
+                </g>
+              );
+            })}
+          </g>
+        );
+      })}
+
+      {/* ---- village and farm sheds ---- */}
+      {[...HOUSES, ...BARNS].map((h, i) => {
         const b = h.box;
         const f = boxFaces(b, yaw);
         const eaveFL = project(b.x, b.h, b.z + b.d, yaw);
@@ -160,6 +194,27 @@ export const Scenery = memo(function Scenery({ yaw }: { yaw: number }) {
             <polygon className="scn-wall scn-wall-right" points={f.right} />
             <polygon className="scn-roof scn-roof-front" points={polygon([eaveFL, eaveFR, ridgeR, ridgeL])} />
             <polygon className="scn-roof scn-roof-back" points={polygon([eaveBL, eaveBR, ridgeR, ridgeL])} />
+          </g>
+        );
+      })}
+
+      {/* ---- grain silos: cylinders, so a body quad plus an elliptical cap ---- */}
+      {SILOS.map((s, i) => {
+        const base = project(s.x, 0, s.z, yaw);
+        const top = project(s.x, s.h, s.z, yaw);
+        return (
+          <g key={`si${i}`} className="scn-silo">
+            <ellipse className="scn-shadow" cx={base.x + 3} cy={base.y + 1} rx={s.r * 1.1} ry={s.r * 0.5} />
+            <polygon
+              className="scn-silo-body"
+              points={polygon([
+                { x: base.x - s.r, y: base.y },
+                { x: base.x + s.r, y: base.y },
+                { x: top.x + s.r, y: top.y },
+                { x: top.x - s.r, y: top.y },
+              ])}
+            />
+            <ellipse className="scn-silo-cap" cx={top.x} cy={top.y} rx={s.r} ry={s.r * 0.45} />
           </g>
         );
       })}

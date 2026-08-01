@@ -27,8 +27,9 @@ No backend, no accounts, no database — the live feed is simulated in the brows
 
 **Site 3D** (default) — an isometric site plan mirroring the brief's Figure 1: the data-centre hall, six
 containerised skids, the substation transformer and the transmission pylon, with an orange "+"
-on everything inspectable, set in continuous terrain — a solar array running off the frame,
-service tracks, hedgerows and a hamlet. The land extends far past the view on every side, so
+on everything inspectable, set in a continuous landscape — neighbouring data-centre halls,
+a solar array running off the frame, service tracks, a hamlet with barns and grain silos, and
+wind turbines on the skyline. The land extends far past the view on every side, so
 the site reads as part of somewhere rather than a model on a tray. All of it is inert scenery:
 aria-hidden, unfocusable, and locked to the neutral tier, so colour and clickability stay
 exclusive to the eight real assets. It opens with a reveal — the scene swings from an off-square yaw to
