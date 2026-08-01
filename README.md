@@ -16,7 +16,7 @@ npm run dev          # http://localhost:5173
 ```
 
 ```bash
-npm test             # 156 tests: pure logic + component/interaction tests
+npm test             # 168 tests: pure logic + component/interaction tests
 npm run build        # typecheck + production build to dist/
 npm run check        # typecheck + lint + tests
 ```
@@ -27,7 +27,11 @@ No backend, no accounts, no database — the live feed is simulated in the brows
 
 **Site 3D** (default) — an isometric site plan mirroring the brief's Figure 1: the data-centre hall, six
 containerised skids, the substation transformer and the transmission pylon, with an orange "+"
-on everything inspectable. It opens with a reveal — the scene swings from an off-square yaw to
+on everything inspectable, set in continuous terrain — a solar array running off the frame,
+service tracks, hedgerows and a hamlet. The land extends far past the view on every side, so
+the site reads as part of somewhere rather than a model on a tray. All of it is inert scenery:
+aria-hidden, unfocusable, and locked to the neutral tier, so colour and clickability stay
+exclusive to the eight real assets. It opens with a reveal — the scene swings from an off-square yaw to
 isometric while components arrive back to front — which introduces where each thing physically
 stands before any data is read. Status rides the container roof strips, so the physical model answers
 "which box do I walk to?" the way the schematic answers "what is connected to what".
@@ -180,7 +184,7 @@ click-to-open: capturing the pointer on the SVG root retargets the click away fr
 **History is in-memory only**, 60 samples per asset for the sparklines. Nothing persists across
 a reload. A real deployment reads a historian.
 
-**Component tests instead of full E2E.** 156 tests: the pure logic (simulator, rules, alarm
+**Component tests instead of full E2E.** 168 tests: the pure logic (simulator, rules, alarm
 feed, event log) plus 26 component tests driving the real DOM via Testing Library — click an
 asset opens its panel, a missing metric renders a dash, a flood groups, Escape closes. These
 exist because a zoom feature once broke click-to-open while every logic test stayed green.

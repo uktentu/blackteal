@@ -1,0 +1,200 @@
+/**
+ * The landscape around the plant.
+ *
+ * One continuous ground surface with organic variation, not a grid of tiles. Everything is
+ * inert: `aria-hidden`, no pointer events, no focus stop, no status colour — it gives the site
+ * a place and a sense of scale without ever competing with the compound for attention.
+ *
+ * Memoized on yaw alone: scenery never changes with telemetry, so a 1 Hz tick must not
+ * re-render a thousand elements.
+ */
+
+import { memo } from 'react';
+import { boxFaces, polygon, project, quad } from './iso/iso';
+import {
+  FENCE,
+  fromScreen,
+  HOUSES,
+  LAND_CORNERS,
+  MEADOWS,
+  PANEL,
+  SOLAR_FAR,
+  SOLAR_ROWS,
+  TRACKS,
+  TREES,
+  TUFTS,
+  TURBINES,
+} from './iso/scenery';
+
+/** Screen-aligned ground point -> screen. */
+const g = (u: number, v: number, yaw: number, y = 0) => {
+  const w = fromScreen(u, v);
+  return project(w.x, y, w.z, yaw);
+};
+
+/** Widen a screen-space polyline into a ribbon, for the service tracks. */
+function ribbon(points: { u: number; v: number }[], halfWidth: number, yaw: number): string {
+  const left = points.map((p, i) => {
+    const prev = points[Math.max(0, i - 1)];
+    const next = points[Math.min(points.length - 1, i + 1)];
+    const du = next.u - prev.u;
+    const dv = next.v - prev.v;
+    const len = Math.hypot(du, dv) || 1;
+    return g(p.u - (dv / len) * halfWidth, p.v + (du / len) * halfWidth, yaw, 0.05);
+  });
+  const right = points
+    .map((p, i) => {
+      const prev = points[Math.max(0, i - 1)];
+      const next = points[Math.min(points.length - 1, i + 1)];
+      const du = next.u - prev.u;
+      const dv = next.v - prev.v;
+      const len = Math.hypot(du, dv) || 1;
+      return g(p.u + (dv / len) * halfWidth, p.v - (du / len) * halfWidth, yaw, 0.05);
+    })
+    .reverse();
+  return polygon([...left, ...right]);
+}
+
+/** A block of tilted PV rows. */
+function SolarBlock({ rows, yaw, cls }: { rows: typeof SOLAR_ROWS; yaw: number; cls: string }) {
+  return (
+    <g className={cls}>
+      {rows.map((b, i) => (
+        <g key={i}>
+          <polygon className="scn-solar-shadow" points={quad(b.x + 2, 0.04, b.z + 2, b.w, b.d, yaw)} />
+          <polygon
+            className="scn-panel"
+            points={polygon([
+              project(b.x, 0, b.z + b.d, yaw),
+              project(b.x + b.w, 0, b.z + b.d, yaw),
+              project(b.x + b.w, PANEL.height, b.z, yaw),
+              project(b.x, PANEL.height, b.z, yaw),
+            ])}
+          />
+        </g>
+      ))}
+    </g>
+  );
+}
+
+export const Scenery = memo(function Scenery({ yaw }: { yaw: number }) {
+  return (
+    <g className="scn" aria-hidden="true" pointerEvents="none">
+      {/* ---- base terrain: one surface, no visible edge ---- */}
+      <polygon
+        className="scn-ground"
+        points={polygon(LAND_CORNERS.map((c) => project(c.x, 0, c.z, yaw)))}
+      />
+
+      {/* ---- broad tonal variation; blurred as a group so no boundary reads as an edge ---- */}
+      <g className="scn-meadows">
+        {MEADOWS.map((m, i) => (
+          <polygon
+            key={`m${i}`}
+            className="scn-meadow"
+            data-tone={m.tone}
+            points={polygon(m.points.map((p) => g(p.u, p.v, yaw)))}
+          />
+        ))}
+      </g>
+
+      {/* ---- service tracks ---- */}
+      {TRACKS.map((t, i) => (
+        <polygon key={`k${i}`} className="scn-track" points={ribbon(t.points, t.halfWidth, yaw)} />
+      ))}
+
+      {/* ---- ground texture ---- */}
+      <g className="scn-tufts">
+        {TUFTS.map((t, i) => {
+          const a = project(t.x, 0, t.z, yaw);
+          const b = project(t.x, t.len, t.z, yaw);
+          return (
+            <path
+              key={`g${i}`}
+              d={`M${a.x.toFixed(1)} ${a.y.toFixed(1)} L${b.x.toFixed(1)} ${b.y.toFixed(1)}`}
+            />
+          );
+        })}
+      </g>
+
+      {/* ---- solar farms ---- */}
+      <SolarBlock rows={SOLAR_FAR} yaw={yaw} cls="scn-solar scn-solar-far" />
+      <SolarBlock rows={SOLAR_ROWS} yaw={yaw} cls="scn-solar" />
+
+      {/* ---- village ---- */}
+      {HOUSES.map((h, i) => {
+        const b = h.box;
+        const f = boxFaces(b, yaw);
+        const eaveFL = project(b.x, b.h, b.z + b.d, yaw);
+        const eaveFR = project(b.x + b.w, b.h, b.z + b.d, yaw);
+        const eaveBL = project(b.x, b.h, b.z, yaw);
+        const eaveBR = project(b.x + b.w, b.h, b.z, yaw);
+        const ridgeL = project(b.x, b.h + h.roof, b.z + b.d / 2, yaw);
+        const ridgeR = project(b.x + b.w, b.h + h.roof, b.z + b.d / 2, yaw);
+
+        return (
+          <g key={`h${i}`} className="scn-house">
+            <polygon className="scn-shadow" points={quad(b.x + 2, 0.03, b.z + 2, b.w, b.d, yaw)} />
+            <polygon className="scn-wall scn-wall-left" points={f.left} />
+            <polygon className="scn-wall scn-wall-right" points={f.right} />
+            <polygon className="scn-roof scn-roof-front" points={polygon([eaveFL, eaveFR, ridgeR, ridgeL])} />
+            <polygon className="scn-roof scn-roof-back" points={polygon([eaveBL, eaveBR, ridgeR, ridgeL])} />
+          </g>
+        );
+      })}
+
+      {/* ---- trees ---- */}
+      {TREES.map((t, i) => {
+        const base = project(t.x, 0, t.z, yaw);
+        const mid = project(t.x, t.r * 1.2, t.z, yaw);
+        const crown = project(t.x, t.r * 2, t.z, yaw);
+        return (
+          <g key={`t${i}`} className="scn-tree">
+            <ellipse className="scn-shadow" cx={base.x + 2} cy={base.y + 1} rx={t.r} ry={t.r * 0.42} />
+            <path
+              className="scn-trunk"
+              d={`M${base.x.toFixed(1)} ${base.y.toFixed(1)} L${mid.x.toFixed(1)} ${mid.y.toFixed(1)}`}
+            />
+            <ellipse className="scn-canopy" cx={crown.x} cy={crown.y} rx={t.r} ry={t.r * 1.05} />
+          </g>
+        );
+      })}
+
+      {/* ---- turbines on the far ridge ---- */}
+      {TURBINES.map((t, i) => {
+        const base = project(t.x, 0, t.z, yaw);
+        const hub = project(t.x, t.h, t.z, yaw);
+        return (
+          <g key={`w${i}`} className="scn-turbine">
+            <path
+              className="scn-mast"
+              d={`M${base.x.toFixed(1)} ${base.y.toFixed(1)} L${hub.x.toFixed(1)} ${hub.y.toFixed(1)}`}
+            />
+            {[90, 210, 330].map((deg) => {
+              const a = ((deg + i * 27) * Math.PI) / 180;
+              return (
+                <path
+                  key={deg}
+                  className="scn-blade"
+                  d={`M${hub.x.toFixed(1)} ${hub.y.toFixed(1)} L${(hub.x + Math.cos(a) * t.r).toFixed(1)} ${(hub.y + Math.sin(a) * t.r * 0.8).toFixed(1)}`}
+                />
+              );
+            })}
+            <circle className="scn-hub" cx={hub.x} cy={hub.y} r={2.2} />
+          </g>
+        );
+      })}
+
+      {/* ---- compound fence: where the operator's responsibility begins ---- */}
+      <polygon
+        className="scn-fence"
+        points={polygon([
+          g(FENCE.u, FENCE.v, yaw, 0.08),
+          g(FENCE.u + FENCE.du, FENCE.v, yaw, 0.08),
+          g(FENCE.u + FENCE.du, FENCE.v + FENCE.dv, yaw, 0.08),
+          g(FENCE.u, FENCE.v + FENCE.dv, yaw, 0.08),
+        ])}
+      />
+    </g>
+  );
+});

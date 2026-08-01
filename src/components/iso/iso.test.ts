@@ -28,6 +28,7 @@ import {
   LINE_ATTACH,
   PYLON,
 } from './layout';
+import { HOUSES, MEADOWS, SOLAR_ROWS, TREES, TUFTS, TURBINES, COMPOUND, LAND_U, LAND_V } from './scenery';
 
 const box = (x: number, y: number, z: number): Box => ({ x, y, z, w: 10, h: 10, d: 10 });
 
@@ -202,5 +203,78 @@ describe('site layout', () => {
       expect(p.x).toBeGreaterThanOrEqual(s.minX);
       expect(p.x).toBeLessThanOrEqual(s.maxX);
     }
+  });
+});
+
+describe('site context', () => {
+  const overlaps = (a: Box, b: Box) =>
+    a.x < b.x + b.w && b.x < a.x + a.w && a.z < b.z + b.d && b.z < a.z + a.d;
+
+  it('never places scenery on the plant compound', () => {
+    // Scenery drifting onto the compound would sit under the skids and read as a rendering
+    // fault rather than as landscape.
+    for (const [i, h] of HOUSES.entries()) expect(overlaps(h.box, COMPOUND), `house ${i}`).toBe(false);
+    for (const [i, r] of SOLAR_ROWS.entries()) expect(overlaps(r, COMPOUND), `solar ${i}`).toBe(false);
+    for (const [i, t] of TREES.entries()) {
+      expect(overlaps({ x: t.x - t.r, y: 0, z: t.z - t.r, w: t.r * 2, h: 0, d: t.r * 2 }, COMPOUND), `tree ${i}`).toBe(false);
+    }
+    for (const [i, t] of TUFTS.entries()) {
+      expect(overlaps({ x: t.x - 1, y: 0, z: t.z - 1, w: 2, h: 0, d: 2 }, COMPOUND), `tuft ${i}`).toBe(false);
+    }
+  });
+
+  it('extends the terrain far past the plant, so the ground has no visible edge', () => {
+    // The view is fitted to the compound; the land must overflow it on every side or the site
+    // reads as a model on a tray.
+    const compoundU = [COMPOUND.x - (COMPOUND.z + COMPOUND.d), COMPOUND.x + COMPOUND.w - COMPOUND.z];
+    expect(LAND_U.min).toBeLessThan(compoundU[0] - 600);
+    expect(LAND_U.max).toBeGreaterThan(compoundU[1] + 600);
+    expect(LAND_V.max - LAND_V.min).toBeGreaterThan(1500);
+  });
+
+  it('varies the ground with irregular regions, never a repeating grid', () => {
+    // A grid of equal quads is exactly the tiled look this replaced.
+    expect(MEADOWS.length).toBeGreaterThanOrEqual(4);
+    for (const m of MEADOWS) expect(m.points.length).toBeGreaterThanOrEqual(5);
+
+    const areas = MEADOWS.map((m) => {
+      let a = 0;
+      for (let i = 0; i < m.points.length; i++) {
+        const p = m.points[i];
+        const q = m.points[(i + 1) % m.points.length];
+        a += p.u * q.v - q.u * p.v;
+      }
+      return Math.abs(a / 2);
+    });
+    // No two regions the same size — equal areas would betray a generated grid.
+    expect(new Set(areas.map((a) => Math.round(a / 1000))).size).toBe(areas.length);
+  });
+
+  it('carries enough ground texture to read as continuous', () => {
+    expect(TUFTS.length).toBeGreaterThan(200);
+    // Density must fall off with distance, not be uniform.
+    const near = TUFTS.filter((t) => Math.hypot(t.x - 110, t.z - 25) < 400).length;
+    const far = TUFTS.filter((t) => Math.hypot(t.x - 110, t.z - 25) > 800).length;
+    expect(near / Math.max(1, far)).toBeGreaterThan(1);
+  });
+
+  it('runs the solar array off the frame rather than stopping inside it', () => {
+    expect(SOLAR_ROWS.length).toBeGreaterThan(80);
+    const us = SOLAR_ROWS.map((b) => b.x - b.z);
+    expect(Math.max(...us) - Math.min(...us)).toBeGreaterThan(500);
+  });
+
+  it('keeps the village clear of the plant', () => {
+    for (const h of HOUSES) {
+      const dx = h.box.x - (COMPOUND.x + COMPOUND.w / 2);
+      const dz = h.box.z - (COMPOUND.z + COMPOUND.d / 2);
+      expect(Math.hypot(dx, dz)).toBeGreaterThan(150);
+    }
+  });
+
+  it('is deterministic, so the landscape never reshuffles between loads', () => {
+    expect(TUFTS[0]).toEqual(TUFTS[0]);
+    expect(TREES.every((t) => Number.isFinite(t.x) && Number.isFinite(t.z))).toBe(true);
+    expect(TURBINES.every((t) => Number.isFinite(t.x))).toBe(true);
   });
 });

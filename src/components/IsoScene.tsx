@@ -43,7 +43,10 @@ import {
   SUB_PAD,
   SUB_RADS,
 } from './iso/layout';
+import { Scenery } from './Scenery';
+
 import './iso.css';
+import './scenery.css';
 
 /** Every asset's clickable volume, so hit-testing and labels share one source. */
 const ASSET_BOX: Record<string, Box> = {
@@ -76,15 +79,25 @@ const SCENE = screenBounds([
   project(PYLON.x + PYLON.arms[0].half, PYLON.arms[0].y, PYLON.z),
 ]);
 
-/** Label gutters: generous left and right, a band on top for the skid group label. */
-const GUTTER = { left: 138, right: 138, top: 42, bottom: 14 };
+/** Label gutters: a band on top for the skid group label, a little breathing room below. */
+const GUTTER = { top: 46, bottom: 20 };
 
-const VIEW = {
-  x: SCENE.minX - GUTTER.left,
-  y: SCENE.minY - GUTTER.top,
-  w: SCENE.maxX - SCENE.minX + GUTTER.left + GUTTER.right,
-  h: SCENE.maxY - SCENE.minY + GUTTER.top + GUTTER.bottom,
-};
+/**
+ * Target frame proportion.
+ *
+ * Height is set by the plant — it must always fit — and width is then derived to match a wide
+ * control-room panel. Because the terrain runs far past the compound, the extra width simply
+ * reveals more landscape instead of leaving dead margins, and the ground has no visible edge
+ * in any direction.
+ */
+const FRAME_ASPECT = 3.0;
+
+const VIEW = (() => {
+  const h = SCENE.maxY - SCENE.minY + GUTTER.top + GUTTER.bottom;
+  const w = h * FRAME_ASPECT;
+  const cx = (SCENE.minX + SCENE.maxX) / 2;
+  return { x: cx - w / 2, y: SCENE.minY - GUTTER.top, w, h };
+})();
 
 /**
  * Where the skid-group label points.
@@ -469,7 +482,11 @@ export function IsoScene({ site, selectedId, flashedId, stale, onSelect }: Props
         style={{ '--intro': intro } as React.CSSProperties}
       >
         {/* ground */}
-        <g className="iso-ground iso-in" style={{ animationDelay: '0ms' }}>
+        <g className="iso-in" style={{ animationDelay: '0ms' }}>
+          <Scenery yaw={yaw} />
+        </g>
+
+        <g className="iso-ground iso-in" style={{ animationDelay: '160ms' }}>
           <polygon className="iso-ground-side" points={boxFaces(GROUND, yaw).right} />
           <polygon className="iso-ground-side" points={boxFaces(GROUND, yaw).left} />
           <polygon className="iso-ground-top" points={boxFaces(GROUND, yaw).top} />
@@ -534,7 +551,7 @@ export function IsoScene({ site, selectedId, flashedId, stale, onSelect }: Props
         {Object.entries(LABELS).map(([id, l]) => {
           const c = topCentre(ASSET_BOX[id], yaw);
           const left = id === 'LOAD';
-          const anchorX = left ? SCENE.minX - 14 : SCENE.maxX + 14;
+          const anchorX = left ? SCENE.minX - 18 : SCENE.maxX + 18;
           // Clamped into the gutter: deriving the height purely from the asset pushed the
           // data-centre annotation above the viewBox, where the viewport clipped it.
           const anchorY = Math.max(VIEW.y + 30, c.y - (left ? 58 : 32));
